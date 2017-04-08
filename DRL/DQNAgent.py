@@ -7,6 +7,7 @@ import DQNConfig
 import DQNUtil
 import DQNNet
 import ImgUtil
+import TFUtil
 
 
 class DQNAgent:
@@ -30,13 +31,7 @@ class DQNAgent:
         self._tf_clone_ops = []
 
     def learn(self, model_save_frequency, model_save_path, use_gpu, gpu_id=None):
-
-        if use_gpu:
-            device_id = gpu_id if gpu_id is not None else 0
-            device_str = '/gpu:' + str(device_id)
-        else:
-            device_str = '/cpu:0'
-
+        device_str = TFUtil.get_device_str(use_gpu=use_gpu, gpu_id=gpu_id)
         with tf.device(device_str):
             # build DQN network
             config = tf.ConfigProto(allow_soft_placement=True, log_device_placement=True)
@@ -54,8 +49,11 @@ class DQNAgent:
             summary_writer = tf.summary.FileWriter(DQNConfig.summary_folder)
             saver = tf.train.Saver()
 
-        # initialize network variables
+        # initialize
         self._tf_sess.run(init)
+
+        # start new episode
+        self._request_new_episode()
 
         # first take some random actions to populate the replay memory before learning starts
         print('Taking random actions to warm up...')
@@ -108,8 +106,34 @@ class DQNAgent:
         # save model after training
         saver.save(self._tf_sess, save_path=model_save_path)
 
-    def test(self, model_load_path):
-        pass
+    def test(self, model_load_path, use_gpu, gpu_id=None):
+        device_str = TFUtil.get_device_str(use_gpu=use_gpu, gpu_id=gpu_id)
+        with tf.device(device_str):
+            # build DQN network
+            config = tf.ConfigProto(allow_soft_placement=True, log_device_placement=True)
+            self._tf_sess = tf.Session(config=config)
+            pn_nodes, _, _ = DQNNet.build_dqn(self._env.get_num_actions())
+            self._tf_pn_state, self._tf_pn_Q, _, _, _, _ = pn_nodes
+
+            # initialize all variables from the model
+            saver = tf.train.Saver()
+            saver.restore(self._tf_sess, model_load_path)
+
+            # start new episode
+            self._request_new_episode()
+
+            # perform testing
+            for i in range(DQNConfig.max_iterations):
+                # select and perform action
+                state = self._get_current_state()
+                state = state[np.newaxis]
+                Q = self._evaluate_q(state)
+                a = self._select_action(Q, i)
+                self._perform_action(a, update_replay_memory=False)
+                if self._env.episode_done():
+                    print('total_reward received: {0}'.format(self._env.get_total_reward()))
+                    self._request_new_episode()
+
 
     def _evaluate_q(self, state):
         assert(self._tf_sess is not None)
@@ -129,14 +153,15 @@ class DQNAgent:
             action = np.argmax(Q)
         return action
 
-    def _perform_action(self, action):
+    def _perform_action(self, action, update_replay_memory=True):
         prev_state = self._histroy_frames.copy_content()
         observation, r, done = self._env.step(action)
         observation = DQNAgent.preprocess_frame(observation)
         self._histroy_frames.record(observation)
         s = self._histroy_frames.copy_content()
-        experience = (prev_state, action, s, r, done)
-        self._replay_memory.add(experience)
+        if update_replay_memory:
+            experience = (prev_state, action, s, r, done)
+            self._replay_memory.add(experience)
         return done
 
     def _request_new_episode(self):
