@@ -1,4 +1,5 @@
 import random
+import cPickle as pickle
 import numpy as np
 from collections import deque
 
@@ -12,10 +13,10 @@ class FrameHistoryBuffer:
         self._buffer = np.zeros((image_size[0], image_size[1], buffer_size))
         self._buffer_size = buffer_size
         self._image_size = image_size
-        self.frame_received = 0
+        self._frame_received = 0
 
     def copy_content(self, size=None):
-        assert self.frame_received >= self._buffer_size
+        assert self._frame_received >= self._buffer_size
         if size is None:
             return self._buffer.copy()
         else:
@@ -26,18 +27,34 @@ class FrameHistoryBuffer:
         if self._buffer_size > 1:
             self._buffer[:, :, 1:self._buffer_size] = self._buffer[:, :, 0:self._buffer_size-1]
         self._buffer[:, :, 0] = frame
-        self.frame_received += 1
+        self._frame_received += 1
 
     def fill_with(self, frame):
         for _ in range(self._buffer_size):
             self.record(frame)
 
     def clear(self):
-        self.frame_received = 0
+        self._frame_received = 0
 
     def get_buffer_size(self):
         return self._buffer_size
 
+    def save(self, file_path):
+        f = open(file_path, 'wb')
+        dump = {}
+        dump['buffer'] = self._buffer
+        dump['buffer_size'] = self._buffer_size
+        dump['image_size'] = self._image_size
+        dump['frame_received'] = self._frame_received
+        pickle.dump(dump, f)
+
+    def load(self, file_path):
+        f = open(file_path, 'rb')
+        dump = pickle.load(f)
+        self._buffer = dump['buffer']
+        self._buffer_size = dump['buffer_size']
+        self._image_size = dump['image_size']
+        self._frame_received = dump['frame_received']
 
 class ExperienceReplayMemory:
     """ Experience Replay Memory used in DQN
@@ -69,6 +86,21 @@ class ExperienceReplayMemory:
 
     def get_grow_size(self):
         return self._count
+
+    def save(self, file_path):
+        f = open(file_path, 'wb')
+        dump = {}        
+        dump['memory'] = self._memory
+        dump['count'] = self._count
+        dump['capacity'] = self._capacity
+        pickle.dump(dump, f)
+
+    def load(self, file_path):
+        f = open(file_path, 'rb')
+        dump = pickle.load(f)        
+        self._memory = dump['memory']
+        self._count = dump['count']
+        self._capacity = dump['capacity']
 
     def _sample_single(self):
         idx = random.randrange(0, self._count)

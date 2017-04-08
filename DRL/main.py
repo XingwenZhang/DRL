@@ -13,9 +13,9 @@ if __name__ == '__main__':
                         help='whether to use GPU (default to True)')
     parser.add_argument('--gpu_id', type=int, default=0,
                         help='the id of the GPU to be used (default to 0)')
-    parser.add_argument('--model_save_path', type=str, default='model/DQN_model.ckpt',
+    parser.add_argument('--model_save_path', type=str, default=None,
                         help='path to save the model for training (default to model/DQN_model.ckpt)')
-    parser.add_argument('--model_load_path', type=str, default='model/DQN_model.ckpt',
+    parser.add_argument('--model_load_path', type=str, default=None,
                         help='path to load the model for training/testing (default to model/DQN_model.ckpt)')
     parser.add_argument('--model_save_freq', type=int, default=10000,
                         help='dump model at every k-th iteration (default to 10000)')
@@ -26,12 +26,14 @@ if __name__ == '__main__':
     if args.mode == 'train':
         env = DQNEnvironment(environment_name=args.gym_environment, display=args.display)
         agent = DQNAgent(env)
-        agent.learn(model_save_frequency=args.model_save_freq, model_save_path=args.model_save_path,
+        assert(args.model_save_path is not None)
+        agent.learn(model_save_frequency=args.model_save_freq, model_save_path=args.model_save_path, model_load_path = args.model_load_path,
                     use_gpu=args.use_gpu, gpu_id=args.gpu_id)
     else:
         # disable frame skipping during testing result in better performance (because the agent can take more actions)
         env = DQNEnvironment(environment_name=args.gym_environment, display=args.display, frame_skipping=False)
         agent = DQNAgent(env)
+        assert(args.model_load_path is not None)
         agent.test(model_load_path=args.model_load_path,
                    use_gpu=args.use_gpu, gpu_id=args.gpu_id)
 

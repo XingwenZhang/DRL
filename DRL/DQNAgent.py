@@ -2,6 +2,7 @@ import random
 
 import tensorflow as tf
 import numpy as np
+import os
 
 import DQNConfig
 import DQNUtil
@@ -30,16 +31,12 @@ class DQNAgent:
         self._tf_tn_Q = None
         self._tf_clone_ops = []
 
-    def learn(self, model_save_frequency, model_save_path, use_gpu, gpu_id=None):
+        self._saver = None
+
+    def learn(self, model_save_frequency, model_save_path, model_load_path, use_gpu, gpu_id):
         device_str = TFUtil.get_device_str(use_gpu=use_gpu, gpu_id=gpu_id)
         with tf.device(device_str):
-            # build DQN network
-            config = tf.ConfigProto(allow_soft_placement=True, log_device_placement=True)
-            self._tf_sess = tf.Session(config=config)
-            pn_nodes, tn_nodes, cloning_ops = DQNNet.build_dqn(self._env.get_num_actions())
-            self._tf_pn_state, self._tf_pn_Q, self._tf_pn_loss, self._tf_pn_actions, self._tf_pn_Q_target, self._tf_pn_train = pn_nodes
-            self._tf_tn_state, self._tf_tn_Q = tn_nodes
-            self._tf_clone_ops = cloning_ops
+            self._init_dqn()
 
             # initialize all variables
             init = tf.global_variables_initializer()
@@ -47,30 +44,32 @@ class DQNAgent:
             # create auxiliary operations: summary and saver
             summary_op = tf.summary.merge_all()
             summary_writer = tf.summary.FileWriter(DQNConfig.summary_folder)
-            saver = tf.train.Saver()
 
         # initialize
-        self._tf_sess.run(init)
+        if model_load_path is None:
+            self._tf_sess.run(init)
+        else:
+            self.load(model_load_path)
 
         # start new episode
         self._request_new_episode()
 
         # first take some random actions to populate the replay memory before learning starts
-        print('Taking random actions to warm up...')
-        self._request_new_episode()
-        for i in range(DQNConfig.replay_start_size):
-            if i % 100 == 0:
-                print('{0}/{1}'.format(i, DQNConfig.replay_start_size))
-            done = self._perform_random_action()
-            if done:
-                self._request_new_episode()
+        if model_load_path is None:
+            print('Taking random actions to warm up...')
+            for i in range(DQNConfig.replay_start_size):
+                if i % 100 == 0:
+                    print('{0}/{1}'.format(i, DQNConfig.replay_start_size))
+                done = self._perform_random_action()
+                if done:
+                    self._request_new_episode()
 
         print('Training started, please open Tensorboard to monitor the training process.')
         for i in range(DQNConfig.max_iterations):
 
             # save model
             if i % model_save_frequency == 0:
-                saver.save(self._tf_sess, save_path=model_save_path)
+                self.save(model_save_path)
 
             # update target_network
             if i % DQNConfig.target_network_update_freq == 0:
@@ -104,36 +103,41 @@ class DQNAgent:
             summary_writer.add_summary(summary, global_step=i)
 
         # save model after training
-        saver.save(self._tf_sess, save_path=model_save_path)
+        self.save(model_save_path)
+
 
     def test(self, model_load_path, use_gpu, gpu_id=None):
+        # build network
         device_str = TFUtil.get_device_str(use_gpu=use_gpu, gpu_id=gpu_id)
         with tf.device(device_str):
-            # build DQN network
-            config = tf.ConfigProto(allow_soft_placement=True, log_device_placement=True)
-            self._tf_sess = tf.Session(config=config)
-            pn_nodes, _, _ = DQNNet.build_dqn(self._env.get_num_actions())
-            self._tf_pn_state, self._tf_pn_Q, _, _, _, _ = pn_nodes
+            self._init_dqn()
 
-            # initialize all variables from the model
-            saver = tf.train.Saver()
-            saver.restore(self._tf_sess, model_load_path)
+        # initialize all variables from the model
+        self.load(model_load_path)
 
-            # start new episode
-            self._request_new_episode()
+        # start new episode
+        self._request_new_episode()
 
-            # perform testing
-            for i in range(DQNConfig.max_iterations):
-                # select and perform action
-                state = self._get_current_state()
-                state = state[np.newaxis]
-                Q = self._evaluate_q(state)
-                a = self._select_action(Q, i)
-                self._perform_action(a, update_replay_memory=False)
-                if self._env.episode_done():
-                    print('total_reward received: {0}'.format(self._env.get_total_reward()))
-                    self._request_new_episode()
+        # perform testing
+        for i in range(DQNConfig.max_iterations):
+            # select and perform action
+            state = self._get_current_state()
+            state = state[np.newaxis]
+            Q = self._evaluate_q(state)
+            a = self._select_action(Q, i)
+            self._perform_action(a)
+            if self._env.episode_done():
+                print('total_reward received: {0}'.format(self._env.get_total_reward()))
+                self._request_new_episode()
 
+    def _init_dqn(self):
+        config = tf.ConfigProto(allow_soft_placement=True, log_device_placement=True)
+        self._tf_sess = tf.Session(config=config)
+        pn_nodes, tn_nodes, cloning_ops = DQNNet.build_dqn(self._env.get_num_actions())
+        self._tf_pn_state, self._tf_pn_Q, self._tf_pn_loss, self._tf_pn_actions, self._tf_pn_Q_target, self._tf_pn_train = pn_nodes
+        self._tf_tn_state, self._tf_tn_Q = tn_nodes
+        self._tf_clone_ops = cloning_ops
+        self._saver = tf.train.Saver()
 
     def _evaluate_q(self, state):
         assert(self._tf_sess is not None)
@@ -153,15 +157,14 @@ class DQNAgent:
             action = np.argmax(Q)
         return action
 
-    def _perform_action(self, action, update_replay_memory=True):
+    def _perform_action(self, action):
         prev_state = self._histroy_frames.copy_content()
         observation, r, done = self._env.step(action)
         observation = DQNAgent.preprocess_frame(observation)
         self._histroy_frames.record(observation)
         s = self._histroy_frames.copy_content()
-        if update_replay_memory:
-            experience = (prev_state, action, s, r, done)
-            self._replay_memory.add(experience)
+        experience = (prev_state, action, s, r, done)
+        self._replay_memory.add(experience)
         return done
 
     def _request_new_episode(self):
@@ -174,6 +177,25 @@ class DQNAgent:
 
     def _get_current_state(self):
         return self._histroy_frames.copy_content()
+
+    def save(self, model_save_path):
+        print('saving model to {0}'.format(model_save_path))
+        self._saver.save(self._tf_sess, save_path=model_save_path)
+        self._histroy_frames.save(model_save_path + '.history_frame_buffer')
+        # replay memory can be huge, so we first dump it to a tmp file then rename it
+        # to the destination to prevent the process being interrupted during dumpping
+        # replay memory
+        self._replay_memory.save(model_save_path + '.replay_memory.tmp')
+        os.remove(model_save_path + '.replay_memory')
+        os.rename(model_save_path + '.replay_memory.tmp', model_save_path + '.replay_memory')
+        print('model saved.')
+
+    def load(self, model_load_path):
+        print('loading model from {0}'.format(model_load_path))
+        self._saver.restore(self._tf_sess, model_load_path)
+        self._replay_memory.load(model_load_path + '.replay_memory')
+        self._histroy_frames.load(model_load_path + '.history_frame_buffer')
+        print('model loaded.')
 
     @staticmethod
     def preprocess_frame(frame):
