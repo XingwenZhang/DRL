@@ -20,7 +20,7 @@ final_exploration_frame = 1000
 exploration_change_rate = (final_exploration - initial_exploration)/final_exploration_frame
 
 # number of history frames to be fed into network
-num_history_frames = 4 # not used in PG
+num_history_frames = -1 # not used in PG
 
 # frame_size
 frame_size = 6400 # input image is already flattened 

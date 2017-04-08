@@ -7,6 +7,7 @@ import PGConfig
 import PGUtil
 import PGNet
 import ImgUtil
+import TFUtil
 
 from collections import deque
 
@@ -34,50 +35,37 @@ class PGAgent:
         self._tf_reward_history = None
         self._tf_average_reward = None
 
-    def learn(self, model_save_frequency, model_save_path, use_gpu, gpu_id=None):
-        if use_gpu:
-            device_id = gpu_id if gpu_id is not None else 0
-            device_str = '/gpu:' + str(device_id)
-        else:
-            device_str = '/cpu:0'
+        # saver
+        self._saver = None
+
+    def learn(self, model_save_frequency, model_save_path, check_point, use_gpu, gpu_id=None):
+        device_str = TFUtil.get_device_str(use_gpu=use_gpu, gpu_id=gpu_id)
         with tf.Graph().as_default():
             with tf.device(device_str):
                 # build PG network
-                config = tf.ConfigProto(allow_soft_placement=True, log_device_placement=True)
-                self._tf_sess = tf.Session(config=config)
+                self._init_pn()
                 
-                placeholders, ops, variables = PGNet.build_pn(self._num_actions)
-                self._tf_pn_state, self._tf_pn_actions, self._tf_pn_advantage, self._tf_reward_history = placeholders
-                self._tf_pn_train_op, self._tf_sample_action = ops
-                self._tf_pn_loss, self._tf_average_reward =  variables
-
                 # initialize all variables
                 init = tf.global_variables_initializer()
 
                 # create auxiliary operations: summary and saver
                 summary_op = tf.summary.merge_all()
                 summary_writer = tf.summary.FileWriter(PGConfig.summary_folder, self._tf_sess.graph)
-                saver = tf.train.Saver()
+                
+            # initialize
+            if check_point is None:
+                self._tf_sess.run(init)
+                episode_idx = 0
+            else:
+                self.load(model_save_path, check_point)
+                episode_idx = check_point
             
-            # initialize network variables
-            self._tf_sess.run(init)
-
-            # start training
-            print('Training started, please open Tensorboard to monitor the training process.')
-            # setup variables
             reward_history = deque(maxlen=100)
             state = self._request_new_episode()
             total_rewards = 0
-            episode_idx = 0
-            #### add code to load model
-            """
-            if FLAGS.ckpt != None:
-                print("load check point")
-                checkpoint_file = os.path.join(FLAGS.log_dir, 'model.ckpt-')
-                checkpoint_file += FLAGS.ckpt
-                saver.restore(sess, checkpoint_file)
-                episode_idx = int(FLAGS.ckpt)
-            """
+            
+            # start training
+            print('Training started, please open Tensorboard to monitor the training process.')
 
             while episode_idx < PGConfig.max_iterations:
                 # sample and perform action, store history
@@ -119,17 +107,51 @@ class PGAgent:
                         print("Episode {}".format(episode_idx))
                         print("Average reward for last 100 episodes: {}".format(average_reward))
 
-                        """
-                        if (episode_idx + 1) % 100 == 0 or (episode_idx + 1) == FLAGS.max_episode:
-                            print("Environment {} saved after {} episodes".format(env_name, episode_idx+1))
-                            checkpoint_file = os.path.join(FLAGS.log_dir, 'model.ckpt')
-                            saver.save(sess, checkpoint_file,
-                                        global_step=episode_idx + 1)
-                        """
+                        
+                    if (episode_idx) % model_save_frequency == 0 or episode_idx == PGConfig.max_iterations:
+                            print("Model saved after {} episodes".format(episode_idx))
+                            self.save(model_save_path, global_step = episode_idx)
 
-    def test(self, model_load_path):
-        pass
+    def test(self, model_save_path, check_point, use_gpu, gpu_id=None):
+        # build network
+        device_str = TFUtil.get_device_str(use_gpu=use_gpu, gpu_id=gpu_id)
+        with tf.device(device_str):
+            self._init_pn()
 
+        # initialize all variables from the model
+        self.load(model_save_path, check_point)
+
+        # start new episode
+        episode_idx = 0
+        total_rewards = 0
+        state = self._request_new_episode()
+        
+        # perform testing
+        while episode_idx <= PGConfig.max_iterations:
+            # sample and perform action, store history
+            action = self._select_action(state, episode_idx)
+            next_state, reward, done = self._perform_action(state, action)
+            total_rewards += reward
+            state = next_state
+            
+            if done:
+                episode_idx += 1
+                print('total_reward received: {0}'.format(total_rewards))
+                state = self._request_new_episode()
+                total_rewards = 0
+
+    
+    def _init_pn(self):
+        # build PG network
+        config = tf.ConfigProto(allow_soft_placement=True, log_device_placement=True)
+        self._tf_sess = tf.Session(config=config)
+        
+        placeholders, ops, variables = PGNet.build_pn(self._num_actions)
+        self._tf_pn_state, self._tf_pn_actions, self._tf_pn_advantage, self._tf_reward_history = placeholders
+        self._tf_pn_train_op, self._tf_sample_action = ops
+        self._tf_pn_loss, self._tf_average_reward =  variables
+        self._saver = saver = tf.train.Saver()
+    
     def _evaluate_q(self, state):
         pass
         """
@@ -174,6 +196,17 @@ class PGAgent:
         """
         return self._histroy_frames.copy_content()
         """
+
+    def save(self, model_save_path, global_step):
+        print('saving model to {0}'.format(model_save_path))
+        self._saver.save(self._tf_sess, save_path=model_save_path, global_step = global_step)
+        print('model saved.')
+
+    def load(self, model_load_path, check_point):
+        checkpoint_file = model_load_path + "-" + str(check_point)
+        print('loading model from {0}'.format(model_load_path))
+        self._saver.restore(self._tf_sess, checkpoint_file)
+        print('model loaded.')
 
     @staticmethod
     def preprocess_frame(frame):

@@ -35,3 +35,11 @@ def huber_loss(x):
     # quadratic for |delta| < 1 and linear for |delta| >= 1
     return tf.where(tf.abs(x) < 1.0, 0.5 * tf.square(x), tf.abs(x) - 0.5)
 
+
+def get_device_str(use_gpu, gpu_id):
+    if use_gpu:
+        device_id = gpu_id if gpu_id is not None else 0
+        device_str = '/gpu:' + str(device_id)
+    else:
+        device_str = '/cpu:0'
+    return device_str
