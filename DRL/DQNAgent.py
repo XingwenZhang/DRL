@@ -33,10 +33,10 @@ class DQNAgent:
 
         self._saver = None
 
-    def learn(self, model_save_frequency, model_save_path, model_load_path, use_gpu, gpu_id):
+    def learn(self, double_dqn, dueling_dqn, model_save_frequency, model_save_path, model_load_path, use_gpu, gpu_id):
         device_str = TFUtil.get_device_str(use_gpu=use_gpu, gpu_id=gpu_id)
         with tf.device(device_str):
-            self._init_dqn()
+            self._init_dqn(dueling_dqn)
 
             # initialize all variables
             init = tf.global_variables_initializer()
@@ -79,7 +79,7 @@ class DQNAgent:
             state = self._get_current_state()
             state = state[np.newaxis]
             Q = self._evaluate_q(state)
-            a = self._select_action(Q, i)
+            a = self._select_action(Q, i, test_mode=False)
             self._perform_action(a)
             if self._env.episode_done():
                 self._request_new_episode()
@@ -89,8 +89,17 @@ class DQNAgent:
             states, actions, states_new, rewards, dones = DQNAgent.decompose_experiences(experiences)
 
             # compute q_targets
-            q_new = self._tf_sess.run(self._tf_tn_Q, feed_dict={self._tf_tn_state: states_new})
-            q_new_max = np.max(q_new, axis=1)
+            if double_dqn:
+                # double DQN: use prediction network for action selection, use target network for action's Q value evaluation
+                q_new_p = self._tf_sess.run(self._tf_pn_Q, feed_dict={self._tf_pn_state: states_new})
+                action = np.argmax(q_new_p, axis=1)
+                q_new_t = self._tf_sess.run(self._tf_tn_Q, feed_dict={self._tf_tn_state: states_new})
+                q_new_max = np.array([q_new_t[j, action[j]] for j in range(DQNConfig.batch_size)])
+            else:
+                # DQN: use target network for action selection and evaluation
+                q_new = self._tf_sess.run(self._tf_tn_Q, feed_dict={self._tf_tn_state: states_new})
+                q_new_max = np.max(q_new, axis=1)
+
             q_targets = rewards + q_new_max * DQNConfig.discounted_factor * (1. - dones.astype(np.int))
 
             # train
@@ -106,11 +115,11 @@ class DQNAgent:
         self.save(model_save_path)
 
 
-    def test(self, model_load_path, use_gpu, gpu_id=None):
+    def test(self, dueling_dqn, model_load_path, use_gpu, gpu_id=None):
         # build network
         device_str = TFUtil.get_device_str(use_gpu=use_gpu, gpu_id=gpu_id)
         with tf.device(device_str):
-            self._init_dqn()
+            self._init_dqn(dueling_dqn)
 
         # initialize all variables from the model
         self.load(model_load_path)
@@ -124,16 +133,16 @@ class DQNAgent:
             state = self._get_current_state()
             state = state[np.newaxis]
             Q = self._evaluate_q(state)
-            a = self._select_action(Q, i)
+            a = self._select_action(Q, i, test_mode=True)
             self._perform_action(a)
             if self._env.episode_done():
                 print('total_reward received: {0}'.format(self._env.get_total_reward()))
                 self._request_new_episode()
 
-    def _init_dqn(self):
+    def _init_dqn(self, dueling_dqn):
         config = tf.ConfigProto(allow_soft_placement=True, log_device_placement=True)
         self._tf_sess = tf.Session(config=config)
-        pn_nodes, tn_nodes, cloning_ops = DQNNet.build_dqn(self._env.get_num_actions())
+        pn_nodes, tn_nodes, cloning_ops = DQNNet.build_dqn(self._env.get_num_actions(), dueling_dqn=dueling_dqn)
         self._tf_pn_state, self._tf_pn_Q, self._tf_pn_loss, self._tf_pn_actions, self._tf_pn_Q_target, self._tf_pn_train = pn_nodes
         self._tf_tn_state, self._tf_tn_Q = tn_nodes
         self._tf_clone_ops = cloning_ops
@@ -145,12 +154,14 @@ class DQNAgent:
         Q = self._tf_sess.run(self._tf_pn_Q, feed_dict={self._tf_pn_state: state})
         return Q
 
-    def _select_action(self, Q, i):
-        if i >= DQNConfig.final_exploration_frame:
-            exploration_prob = DQNConfig.final_exploration
+    def _select_action(self, Q, i, test_mode=False):
+        if test_mode:
+            exploration_prob = DQNConfig.test_exploration
         else:
-            exploration_prob = DQNConfig.initial_exploration + i * DQNConfig.exploration_change_rate
-
+            if i >= DQNConfig.final_exploration_frame:
+                exploration_prob = DQNConfig.final_exploration
+            else:
+                exploration_prob = DQNConfig.initial_exploration + i * DQNConfig.exploration_change_rate
         if random.random() < exploration_prob:
             action = random.randrange(0, self._env.get_num_actions())
         else:
@@ -186,7 +197,8 @@ class DQNAgent:
         # to the destination to prevent the process being interrupted during dumpping
         # replay memory
         self._replay_memory.save(model_save_path + '.replay_memory.tmp')
-        os.remove(model_save_path + '.replay_memory')
+        if os.path.exists(model_save_path + '.replay_memory'):
+            os.remove(model_save_path + '.replay_memory')
         os.rename(model_save_path + '.replay_memory.tmp', model_save_path + '.replay_memory')
         print('model saved.')
 

@@ -13,10 +13,14 @@ if __name__ == '__main__':
                         help='whether to use GPU (default to True)')
     parser.add_argument('--gpu_id', type=int, default=0,
                         help='the id of the GPU to be used (default to 0)')
+    parser.add_argument('--double_dqn', type=bool, default=False,
+                        help='whether to use double DQN algorithm (default to False)')
+    parser.add_argument('--dueling_dqn', type=bool, default=False,
+                        help='whether to use dueling DQN architecture (default to False)')
     parser.add_argument('--model_save_path', type=str, default=None,
-                        help='path to save the model for training (default to model/DQN_model.ckpt)')
+                        help='path to save the model for training (default to None)')
     parser.add_argument('--model_load_path', type=str, default=None,
-                        help='path to load the model for training/testing (default to model/DQN_model.ckpt)')
+                        help='path to load the model for training/testing (default to None)')
     parser.add_argument('--model_save_freq', type=int, default=10000,
                         help='dump model at every k-th iteration (default to 10000)')
     parser.add_argument('--display', type=bool, default=False,
@@ -27,14 +31,16 @@ if __name__ == '__main__':
         env = DQNEnvironment(environment_name=args.gym_environment, display=args.display)
         agent = DQNAgent(env)
         assert(args.model_save_path is not None)
-        agent.learn(model_save_frequency=args.model_save_freq, model_save_path=args.model_save_path, model_load_path = args.model_load_path,
+        agent.learn(double_dqn=args.double_dqn, dueling_dqn=args.dueling_dqn,
+                    model_save_frequency=args.model_save_freq, model_save_path=args.model_save_path, model_load_path = args.model_load_path,
                     use_gpu=args.use_gpu, gpu_id=args.gpu_id)
     else:
         # disable frame skipping during testing result in better performance (because the agent can take more actions)
         env = DQNEnvironment(environment_name=args.gym_environment, display=args.display, frame_skipping=False)
         agent = DQNAgent(env)
         assert(args.model_load_path is not None)
-        agent.test(model_load_path=args.model_load_path,
+        agent.test(dueling_dqn=args.dueling_dqn, 
+                   model_load_path=args.model_load_path,
                    use_gpu=args.use_gpu, gpu_id=args.gpu_id)
 
     print('finished.')

@@ -2,7 +2,7 @@ import tensorflow as tf
 
 
 # max iterations for training (-1 means forever)
-max_iterations = 5000000
+max_iterations = 500000
 
 # discounted factor
 discounted_factor = 0.99
@@ -15,6 +15,7 @@ initial_exploration = 1
 final_exploration = 0.1
 final_exploration_frame = 1000000
 exploration_change_rate = (final_exploration - initial_exploration)/final_exploration_frame
+test_exploration = 0.1
 
 # number of history frames to be fed into Q network
 num_history_frames = 4
@@ -36,6 +37,7 @@ replay_memory = 1000000
 
 # number of random actions to take (to fill replay memory) before learning starts
 replay_start_size = 50000
+# replay_start_size = 500 # uncomment only during development & debugging
 
 # the frequency with which the target network is updated
 target_network_update_freq = 10000
