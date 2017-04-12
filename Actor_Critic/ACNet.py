@@ -51,6 +51,7 @@ def build_actor_critic_network(num_action):
                 tf.zeros([num_action]),
                 name='biases')
             actor_logits = tf.matmul(hid, weights) + biases
+            actor_probs = tf.nn.softmax(logits = actor_logits)
 
         # critic (state) value
         with tf.variable_scope('critic_value'):
@@ -70,12 +71,12 @@ def build_actor_critic_network(num_action):
                 name   = 'log_prob',
                 labels = action_placeholder,
                 logits = actor_logits)
-            policy_loss = - tf.reduce_sum(log_prob * advantage_placeholder)
-            policy_entropy = - tf.reduce_sum(tf.exp(log_prob) * log_prob)
+            policy_loss = - tf.reduce_sum(log_prob * advantage_placeholder) / ACConfig.batch_size
+            policy_entropy = - tf.reduce_sum(actor_probs * tf.log(actor_probs + 1e-15)) / ACConfig.batch_size
             # value_loss
-            value_loss = tf.reduce_sum(tf.square(q_value_placeholder - critic_value)) 
+            value_loss = tf.reduce_sum(tf.square(q_value_placeholder - critic_value)) / ACConfig.batch_size
             # need to tweak weight
-            loss = (policy_loss + 0.5 * value_loss - 0.005 * policy_entropy) / ACConfig.batch_size
+            loss = policy_loss + 0.5 * value_loss - 0.005 * policy_entropy
             
     # train_op
     """
