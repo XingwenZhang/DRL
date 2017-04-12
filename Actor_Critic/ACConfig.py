@@ -8,7 +8,7 @@ max_iterations = 50000
 discounted_factor = 0.99
 
 # learning rate
-lr = 1e-3
+lr = 2e-3
 
 # decay
 decay = 0.99
@@ -23,7 +23,7 @@ exploration_change_rate = (final_exploration - initial_exploration)/final_explor
 num_history_frames = -1 # not used in PG
 
 # frame_size
-frame_size = 6400 # input image is already flattened 
+frame_size = 6400 # input image is already flattened
 
 # num_hid, number of hidden units
 num_hid = 150

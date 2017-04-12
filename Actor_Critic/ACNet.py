@@ -73,9 +73,9 @@ def build_actor_critic_network(num_action):
             policy_loss = - tf.reduce_sum(log_prob * advantage_placeholder)
             policy_entropy = - tf.reduce_sum(tf.exp(log_prob) * log_prob)
             # value_loss
-            value_loss = tf.reduce_sum(tf.square(q_value_placeholder - critic_value))
+            value_loss = tf.reduce_sum(tf.square(q_value_placeholder - critic_value)) 
             # need to tweak weight
-            loss = policy_loss + 0.5 * value_loss - 0.005 * policy_entropy
+            loss = (policy_loss + 0.5 * value_loss - 0.005 * policy_entropy) / ACConfig.batch_size
             
     # train_op
     """
