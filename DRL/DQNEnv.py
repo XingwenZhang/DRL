@@ -29,7 +29,7 @@ class DQNEnvironment:
             if self._done:
                 break
         # as scores vary from game to game, we clipped reward at -1 and 1
-        # np.clip(accumulated_reward, -1, 1)  # TODO: Do we need this trick?
+        accumulated_reward = np.clip(accumulated_reward, -1, 1)  # TODO: Do we need this trick?
         self._total_episode_reward += accumulated_reward
         return observation, reward, self._done
 
