@@ -45,6 +45,7 @@ class HistoryBuffer:
             max_step_reached = False
             for s in xrange(self._max_step):
                 if t + s >= N:
+                    # for debugging
                     print N 
                     print t + s
                     print self._reward_buffer

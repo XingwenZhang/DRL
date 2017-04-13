@@ -140,6 +140,7 @@ class ACAgent:
             if done:
                 episode_idx += 1
                 print('total_reward received: {0}'.format(total_rewards))
+                self._history_buffer.clean_up()
                 state = self._request_new_episode()
                 total_rewards = 0
 
