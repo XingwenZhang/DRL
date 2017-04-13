@@ -18,6 +18,7 @@ initial_exploration = 0.5
 final_exploration = 0.0
 final_exploration_frame = 1000
 exploration_change_rate = (final_exploration - initial_exploration)/final_exploration_frame
+test_exploration = 0.0
 
 # number of history frames to be fed into network
 num_history_frames = -1 # not used in PG

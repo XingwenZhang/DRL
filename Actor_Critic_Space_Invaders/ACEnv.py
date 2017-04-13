@@ -30,6 +30,8 @@ class ACEnvironment:
                 break
         # as scores vary from game to game, we clipped reward at -1 and 1
         accumulated_reward = np.clip(accumulated_reward, -1, 1)
+        reward = np.clip(reward, -1, 1)
+
         self._total_episode_reward += accumulated_reward
         return observation, reward, self._done
 

@@ -132,7 +132,7 @@ class ACAgent:
         # perform testing
         while episode_idx <= ACConfig.max_iterations:
             # sample and perform action, store history
-            action = self._select_action(state, episode_idx)
+            action = self._select_action(state, episode_idx, test_mode = True)
             next_state, reward, done = self._perform_action(state, action)
             total_rewards += reward
             state = next_state
@@ -164,16 +164,23 @@ class ACAgent:
         return Q
         """
 
-    def _select_action(self, state, i):
-        if i >= ACConfig.final_exploration_frame:
-            exploration_prob = ACConfig.final_exploration
+    def _select_action(self, state, i, test_mode = False):
+        if test_mode:
+            exploration_prob = ACConfig.test_exploration
         else:
-            exploration_prob = ACConfig.initial_exploration + i * ACConfig.exploration_change_rate
+            if i >= ACConfig.final_exploration_frame:
+                exploration_prob = ACConfig.final_exploration
+            else:
+                exploration_prob = ACConfig.initial_exploration + i * ACConfig.exploration_change_rate
         
         if random.random() < exploration_prob:
             action = random.randrange(0, self._num_actions)
         else:
-            action = self._tf_sess.run(self._tf_sample_action, {self._tf_acn_state: state[np.newaxis, :]})[0][0]
+            if test_mode:
+                # need to modify it
+                action = self._tf_sess.run(self._tf_sample_action, {self._tf_acn_state: state[np.newaxis, :]})[0][0]
+            else:
+                action = self._tf_sess.run(self._tf_sample_action, {self._tf_acn_state: state[np.newaxis, :]})[0][0]
         return action
 
     def _perform_action(self, state, action):

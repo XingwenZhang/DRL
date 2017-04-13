@@ -8,7 +8,7 @@ max_iterations = 50000
 discounted_factor = 0.99
 
 # learning rate
-lr = 2e-3
+lr = 5e-4
 
 # decay
 decay = 0.99
@@ -18,6 +18,7 @@ initial_exploration = 1
 final_exploration = 0.00
 final_exploration_frame = 1000
 exploration_change_rate = (final_exploration - initial_exploration)/final_exploration_frame
+test_exploration = 0.0
 
 # number of history frames to be fed into network
 num_history_frames = 4

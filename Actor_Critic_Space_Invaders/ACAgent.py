@@ -17,6 +17,7 @@ class ACAgent:
     def __init__(self, env):
         # environment related objects
         self._env = env
+        self._num_actions = self._env.get_num_actions()
         
         #self._replay_memory = PGUtil.ExperienceReplayMemory(ACConfig.replay_memory)
         #self._histroy_frames = PGUtil.FrameHistoryBuffer(ACConfig.frame_size, ACConfig.num_history_frames)
@@ -74,9 +75,8 @@ class ACAgent:
                 total_rewards += reward
                 state = next_state
 
-                print reward
-                # if reward != 0: # Pong has either +1 or -1 reward exactly when game ends.
-                ##  print (('ep %d: game finished, reward: %f' % (episode_idx + 1, reward)) + ('' if reward == -1 else ' !!!!!!!!'))
+                #if reward != 0: # Pong has either +1 or -1 reward exactly when game ends.
+                #    print (('ep %d: game finished, reward: %f' % (episode_idx + 1, reward)) + ('' if reward == -1 else ' !!!!!!!!'))
 
                 if done:
                     episode_idx += 1
@@ -132,7 +132,7 @@ class ACAgent:
         # perform testing
         while episode_idx <= ACConfig.max_iterations:
             # sample and perform action, store history
-            action = self._select_action(state, episode_idx)
+            action = self._select_action(state, episode_idx, test_mode = True)
             next_state, reward, done = self._perform_action(state, action)
             total_rewards += reward
             state = next_state
@@ -149,10 +149,10 @@ class ACAgent:
         config = tf.ConfigProto(allow_soft_placement=True, log_device_placement=True)
         self._tf_sess = tf.Session(config=config)
         
-        placeholders, ops, variables = ACNet.build_actor_critic_network(self._env.get_num_actions())
+        placeholders, ops, variables = ACNet.build_actor_critic_network(self._num_actions)
         self._tf_acn_state, self._tf_acn_action, self._tf_acn_q_value, self._tf_acn_advantage, self._tf_reward_history = placeholders
         self._tf_acn_train_op, self._tf_sample_action = ops
-        self._tf_acn_critic_value, self._tf_average_reward = variables
+        self._tf_acn_actor_logits, self._tf_acn_critic_value, self._tf_average_reward = variables
         self._saver = saver = tf.train.Saver()
     
     def _evaluate_q(self, state):
@@ -164,16 +164,23 @@ class ACAgent:
         return Q
         """
 
-    def _select_action(self, state, i):
-        if i >= ACConfig.final_exploration_frame:
-            exploration_prob = ACConfig.final_exploration
+    def _select_action(self, state, i, test_mode = False):
+        if test_mode:
+            exploration_prob = ACConfig.test_exploration
         else:
-            exploration_prob = ACConfig.initial_exploration + i * ACConfig.exploration_change_rate
+            if i >= ACConfig.final_exploration_frame:
+                exploration_prob = ACConfig.final_exploration
+            else:
+                exploration_prob = ACConfig.initial_exploration + i * ACConfig.exploration_change_rate
         
         if random.random() < exploration_prob:
             action = random.randrange(0, self._num_actions)
         else:
-            action = self._tf_sess.run(self._tf_sample_action, {self._tf_acn_state: state[np.newaxis, :]})[0][0]
+            if test_mode:
+                # need to modify it
+                action = np.argmax(self._tf_sess.run(self._tf_acn_actor_logits, {self._tf_acn_state: state[np.newaxis, :]})[0])
+            else:
+                action = self._tf_sess.run(self._tf_sample_action, {self._tf_acn_state: state[np.newaxis, :]})[0][0]
         return action
 
     def _perform_action(self, state, action):
@@ -184,8 +191,8 @@ class ACAgent:
         # store roll out
         self._history_buffer.store_rollout(state, reward, action, value)
         # get next state using current state and next frame
-        next_frame = self.preprocess_frame(next_frame)
-        next_state = np.stack((state[:, :, 1:], next_frame), axis = 2)
+        next_frame = self.preprocess_frame(next_frame)[:, :, np.newaxis]
+        next_state = np.concatenate((state[:, :, 1:], next_frame), axis = 2)
         return next_state, reward, done
 
     def _request_new_episode(self):

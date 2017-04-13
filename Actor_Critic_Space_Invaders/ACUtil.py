@@ -28,12 +28,6 @@ class HistoryBuffer:
         self._reward_buffer.append(reward)
         self._action_buffer.append(action)
         self._value_buffer.append(value)
-    
-    def get_last_state(self):
-        if self._state_buffer:
-            return self._state_buffer[-1]
-        else:
-            return None
 
     def clean_up(self):
         self._state_buffer  = []
@@ -51,15 +45,13 @@ class HistoryBuffer:
             max_step_reached = False
             for s in xrange(self._max_step):
                 if t + s >= N:
-                    print N 
-                    print t + s
-                    print self._reward_buffer
+                    max_step_reached = True
                     break
                 q_value[t] += discount * self._reward_buffer[t+s]
                 discount *= self._discount_factor
-                if self._reward_buffer[t+s] != 0:
-                    max_step_reached = True
-                    break
+                #if self._reward_buffer[t+s] != 0:
+                #    max_step_reached = True
+                #    break
             if not max_step_reached and t + self._max_step < N:
                 q_value[t] += discount * self._value_buffer[t+self._max_step] 
                     

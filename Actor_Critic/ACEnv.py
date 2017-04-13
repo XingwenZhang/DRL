@@ -9,7 +9,7 @@ import ACConfig
 class ACEnvironment:
     def __init__(self, environment_name, display=False, frame_skipping=False):
         self._env = gym.make(environment_name)
-        self._dispaly = display
+        self._display = display
         self._done = True
         self._total_episode_reward = 0
         self._frame_skipping = frame_skipping
@@ -23,7 +23,7 @@ class ACEnvironment:
             skip_interval = 1
         for i in range(ACConfig.frame_skip_interval):
             observation, reward, self._done, info = self._env.step(action)
-            if self._dispaly:
+            if self._display:
                 self._env.render()
             accumulated_reward += reward
             if self._done:
