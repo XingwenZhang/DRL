@@ -24,6 +24,7 @@ class FrameHistoryBuffer:
             return self._buffer[:, :, 0:size].copy()
 
     def record(self, frame):
+        assert(frame is not None)
         if self._buffer_size > 1:
             self._buffer[:, :, 1:self._buffer_size] = self._buffer[:, :, 0:self._buffer_size-1]
         self._buffer[:, :, 0] = frame
@@ -105,3 +106,5 @@ class ExperienceReplayMemory:
     def _sample_single(self):
         idx = random.randrange(0, self._count)
         return self._memory[idx]
+
+

@@ -36,8 +36,8 @@ def build_dqn(num_action, dueling_dqn=False):
             pn_loss = tf.reduce_sum(TFUtil.huber_loss(pn_delta)) / DQNConfig.batch_size
 
             # summary
-            tf.summary.scalar('pn_loss', pn_loss)
-            tf.summary.scalar('averaged pn_Q', tf.reduce_mean(pn_Q))
+            summary_pn_loss = tf.summary.scalar('pn_loss', pn_loss)
+            summary_averaged_pn_Q = tf.summary.scalar('averaged_pn_Q', tf.reduce_mean(pn_Q))
 
             # optimizer
             pn_train = tf.train.RMSPropOptimizer(learning_rate=DQNConfig.lr).minimize(pn_loss)
@@ -67,7 +67,12 @@ def build_dqn(num_action, dueling_dqn=False):
             assert (tn_variable_dict.keys() == pn_variable_dict.keys())
             for k in tn_variable_dict.keys():
                 network_cloning_ops.append(tf.assign(tn_variable_dict[k], pn_variable_dict[k]))
-    
-    return (pn_states, pn_Q, pn_loss, pn_actions, pn_q_target, pn_train), (tn_states, tn_Q), network_cloning_ops
+
+        # Performance Evaluation
+        with tf.variable_scope('performance_evaluation'):
+            episode_reward = tf.placeholder(name='episode_reward', shape=(), dtype=tf.float32)
+            summary_avg_episode_reward = tf.summary.scalar('episode_reward', episode_reward)
+
+    return (pn_states, pn_Q, pn_loss, pn_actions, pn_q_target, pn_train), (tn_states, tn_Q), network_cloning_ops, (summary_pn_loss, summary_averaged_pn_Q), (episode_reward, summary_avg_episode_reward)
 
 

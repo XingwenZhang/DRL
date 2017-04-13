@@ -10,7 +10,6 @@ import DQNNet
 import ImgUtil
 import TFUtil
 
-
 class DQNAgent:
     """ Agent with Deep Q Network
     """
@@ -30,7 +29,12 @@ class DQNAgent:
         self._tf_tn_state = None
         self._tf_tn_Q = None
         self._tf_clone_ops = []
+        self._tf_episode_reward = None
 
+        self._tf_summary_pn_loss = None
+        self._tf_summary_averaged_pn_Q = None
+        self._tf_summary_episode_reward = None
+        self._tf_episode_reward = None
         self._saver = None
 
     def learn(self, double_dqn, dueling_dqn, model_save_frequency, model_save_path, model_load_path, use_gpu, gpu_id):
@@ -65,11 +69,11 @@ class DQNAgent:
                     self._request_new_episode()
 
         print('Training started, please open Tensorboard to monitor the training process.')
+        episode_count=0
         for i in range(DQNConfig.max_iterations):
 
             if i % 1000 ==0:
                 print('{0}/{1}'.format(i, DQNConfig.max_iterations))
-                print('-- replay_memory_grow_size: {0}'.format(self._replay_memory.get_grow_size()))
 
             # save model
             if i % model_save_frequency == 0 and i != 0:
@@ -86,7 +90,14 @@ class DQNAgent:
             a = self._select_action(Q, i, test_mode=False)
             self._perform_action(a)
             if self._env.episode_done():
+                episode_reward = self._env.get_total_reward()
+                summary_episode_reward = self._tf_sess.run(self._tf_summary_episode_reward,
+                                                           feed_dict={self._tf_episode_reward: episode_reward})
+                summary_writer.add_summary(summary_episode_reward, global_step=episode_count)
+                # print('episode {0}: {1}'.format(episode_count, episode_reward))
+                episode_count += 1
                 self._request_new_episode()
+
 
             # sample mini-batch and perform training
             experiences = self._replay_memory.sample(DQNConfig.batch_size)
@@ -107,17 +118,15 @@ class DQNAgent:
             q_targets = rewards + q_new_max * DQNConfig.discounted_factor * (1. - dones.astype(np.int))
 
             # train
-            _, loss, summary = self._tf_sess.run([self._tf_pn_train, self._tf_pn_loss, summary_op],
-                                                 feed_dict={self._tf_pn_actions: actions,
-                                                            self._tf_pn_state: states,
-                                                            self._tf_pn_Q_target: q_targets})
-
-            # record summary
-            summary_writer.add_summary(summary, global_step=i)
+            _, loss, summary_pn_loss, summary_averaged_pn_Q = self._tf_sess.run([self._tf_pn_train, self._tf_pn_loss, self._tf_summary_pn_loss, self._tf_summary_averaged_pn_Q],
+                                                                                feed_dict={self._tf_pn_actions: actions,
+                                                                                           self._tf_pn_state: states,
+                                                                                           self._tf_pn_Q_target: q_targets})
+            summary_writer.add_summary(summary_pn_loss, global_step=i)
+            summary_writer.add_summary(summary_averaged_pn_Q, global_step=i)
 
         # save model after training
         self.save(model_save_path)
-
 
     def test(self, dueling_dqn, model_load_path, use_gpu, gpu_id=None):
         # build network
@@ -147,10 +156,12 @@ class DQNAgent:
         config = tf.ConfigProto(allow_soft_placement=True, log_device_placement=True)
         config.gpu_options.allow_growth = True
         self._tf_sess = tf.Session(config=config)
-        pn_nodes, tn_nodes, cloning_ops = DQNNet.build_dqn(self._env.get_num_actions(), dueling_dqn=dueling_dqn)
+        pn_nodes, tn_nodes, cloning_ops, train_summary_ops, evaluation = DQNNet.build_dqn(self._env.get_num_actions(), dueling_dqn=dueling_dqn)
         self._tf_pn_state, self._tf_pn_Q, self._tf_pn_loss, self._tf_pn_actions, self._tf_pn_Q_target, self._tf_pn_train = pn_nodes
         self._tf_tn_state, self._tf_tn_Q = tn_nodes
         self._tf_clone_ops = cloning_ops
+        self._tf_summary_pn_loss, self._tf_summary_averaged_pn_Q = train_summary_ops
+        self._tf_episode_reward, self._tf_summary_episode_reward = evaluation
         self._saver = tf.train.Saver()
 
     def _evaluate_q(self, state):
@@ -185,6 +196,8 @@ class DQNAgent:
 
     def _request_new_episode(self):
         observation = self._env.reset()
+        observation = DQNAgent.preprocess_frame(observation)
+        assert(observation is not None)
         self._histroy_frames.fill_with(observation)
 
     def _perform_random_action(self):

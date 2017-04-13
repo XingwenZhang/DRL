@@ -15,7 +15,7 @@ initial_exploration = 1
 final_exploration = 0.1
 final_exploration_frame = 1000000
 exploration_change_rate = (final_exploration - initial_exploration)/final_exploration_frame
-test_exploration = 0.1
+test_exploration = 0.
 
 # number of history frames to be fed into Q network
 num_history_frames = 4

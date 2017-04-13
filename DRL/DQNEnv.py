@@ -23,9 +23,9 @@ class DQNEnvironment:
             skip_interval = 1
         for i in range(skip_interval):
             observation, reward, self._done, info = self._env.step(action)
+            accumulated_reward += reward
             if self._dispaly:
                 self._env.render()
-            accumulated_reward += reward
             if self._done:
                 break
         # as scores vary from game to game, we clipped reward at -1 and 1
@@ -34,9 +34,10 @@ class DQNEnvironment:
         return observation, reward, self._done
 
     def reset(self):
-        self._env.reset()
+        observation = self._env.reset()
         self._done = False
         self._total_episode_reward = 0
+        return observation
 
     def render(self):
         self._env.render()
