@@ -42,5 +42,5 @@ def get_device_str(use_gpu, gpu_id):
         device_str = '/gpu:' + str(device_id)
     else:
         device_str = '/cpu:0'
-
+    return device_str
 

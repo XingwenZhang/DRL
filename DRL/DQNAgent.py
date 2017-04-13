@@ -67,8 +67,12 @@ class DQNAgent:
         print('Training started, please open Tensorboard to monitor the training process.')
         for i in range(DQNConfig.max_iterations):
 
+            if i % 1000 ==0:
+                print('{0}/{1}'.format(i, DQNConfig.max_iterations))
+                print('-- replay_memory_grow_size: {0}'.format(self._replay_memory.get_grow_size()))
+
             # save model
-            if i % model_save_frequency == 0:
+            if i % model_save_frequency == 0 and i != 0:
                 self.save(model_save_path)
 
             # update target_network
@@ -141,6 +145,7 @@ class DQNAgent:
 
     def _init_dqn(self, dueling_dqn):
         config = tf.ConfigProto(allow_soft_placement=True, log_device_placement=True)
+        config.gpu_options.allow_growth = True
         self._tf_sess = tf.Session(config=config)
         pn_nodes, tn_nodes, cloning_ops = DQNNet.build_dqn(self._env.get_num_actions(), dueling_dqn=dueling_dqn)
         self._tf_pn_state, self._tf_pn_Q, self._tf_pn_loss, self._tf_pn_actions, self._tf_pn_Q_target, self._tf_pn_train = pn_nodes
@@ -196,16 +201,18 @@ class DQNAgent:
         # replay memory can be huge, so we first dump it to a tmp file then rename it
         # to the destination to prevent the process being interrupted during dumpping
         # replay memory
-        self._replay_memory.save(model_save_path + '.replay_memory.tmp')
-        if os.path.exists(model_save_path + '.replay_memory'):
-            os.remove(model_save_path + '.replay_memory')
-        os.rename(model_save_path + '.replay_memory.tmp', model_save_path + '.replay_memory')
+        if False:
+            self._replay_memory.save(model_save_path + '.replay_memory.tmp')
+            if os.path.exists(model_save_path + '.replay_memory'):
+                os.remove(model_save_path + '.replay_memory')
+            os.rename(model_save_path + '.replay_memory.tmp', model_save_path + '.replay_memory')
         print('model saved.')
 
     def load(self, model_load_path):
         print('loading model from {0}'.format(model_load_path))
         self._saver.restore(self._tf_sess, model_load_path)
-        self._replay_memory.load(model_load_path + '.replay_memory')
+        if False:
+            self._replay_memory.load(model_load_path + '.replay_memory')
         self._histroy_frames.load(model_load_path + '.history_frame_buffer')
         print('model loaded.')
 
