@@ -2,7 +2,7 @@ import tensorflow as tf
 
 
 # max iterations for training (-1 means forever)
-max_iterations = 500000
+max_iterations = 18000000
 
 # discounted factor
 discounted_factor = 0.99

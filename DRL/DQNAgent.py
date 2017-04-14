@@ -94,7 +94,6 @@ class DQNAgent:
                 summary_episode_reward = self._tf_sess.run(self._tf_summary_episode_reward,
                                                            feed_dict={self._tf_episode_reward: episode_reward})
                 summary_writer.add_summary(summary_episode_reward, global_step=episode_count)
-                # print('episode {0}: {1}'.format(episode_count, episode_reward))
                 episode_count += 1
                 self._request_new_episode()
 
