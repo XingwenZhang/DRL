@@ -26,7 +26,7 @@ class A3CAgent:
         self._envs = [A3CEnvironment(environment_name=env_name, display=display, frame_skipping=frame_skipping) \
                       for _ in xrange(self._num_threads)]
         self._num_actions = self._envs[0].get_num_actions()
-        self._episode_reward_buffer = deque(100)
+        self._episode_reward_buffer = deque(maxlen=100)
         
         #self._replay_memory = PGUtil.ExperienceReplayMemory(A3CConfig.replay_memory)
         #self._histroy_frames = PGUtil.FrameHistoryBuffer(A3CConfig.frame_size, A3CConfig.num_history_frames)
@@ -34,6 +34,7 @@ class A3CAgent:
         self._iter_idx = 0
 
         # tensors
+        self._tf_global_step = None
         self._tf_acn_state = None
         self._tf_acn_action = None
         self._tf_acn_q_value = None
@@ -67,14 +68,14 @@ class A3CAgent:
             # initialize or load network variables
             if check_point is None:
                 self._tf_sess.run(init)
-                episode_idx = 0
+                self._iter_idx = episode_idx = 0
             else:
                 self.load(self._model_save_path, check_point)
-                episode_idx = check_point
+                self._iter_idx = check_point
         
         # start training
         # create learner threads
-        learner_threads = [threading.Thread(target=self.learner_thread, args=(thread_id))\
+        learner_threads = [threading.Thread(target=self.learner_thread, args=(thread_id, ))\
                            for thread_id in xrange(self._num_threads)]
         for t in learner_threads:
             t.start()
@@ -132,7 +133,8 @@ class A3CAgent:
             
             _, average_reward, summary = \
             self._tf_sess.run([self._tf_acn_train_op, self._tf_average_reward, self._tf_summary_op],
-                              feed_dict={self._tf_acn_state: states,
+                              feed_dict={self._tf_global_step: self._iter_idx,
+                                         self._tf_acn_state: states,
                                          self._tf_acn_action: actions,
                                          self._tf_acn_q_value: q_values,
                                          self._tf_acn_advantage: advantages,
@@ -148,34 +150,36 @@ class A3CAgent:
                 self.save(self._model_save_path, global_step = self._iter_idx)
 
 
-    def test(self, model_save_path, check_point, use_gpu, gpu_id=None):
-        ###### TODOS
+    def test(self, check_point, use_gpu, gpu_id=None):
+        assert(len(self._envs) == 1)
+        env = self._envs[0]
+        history_buffer = A3CUtil.HistoryBuffer()
+
         # build network
         device_str = TFUtil.get_device_str(use_gpu=use_gpu, gpu_id=gpu_id)
         with tf.device(device_str):
-            self._init_network()
-
-        # initialize all variables from the model
-        self.load(model_save_path, check_point)
+            #self._init_network()
+            # initialize all variables from the model
+            self.load(self._model_save_path, check_point)
 
         # start new episode
         episode_idx = 0
         total_rewards = 0
-        state = self._request_new_episode()
+        state = self._request_new_episode(env)
         
         # perform testing
         while episode_idx <= A3CConfig.max_iterations:
             # sample and perform action, store history
             action = self._select_action(state, episode_idx, test_mode = True)
-            next_state, reward, done = self._perform_action(state, action)
+            next_state, reward, done = self._perform_action(env, state, action, history_buffer)
             total_rewards += reward
             state = next_state
             
             if done:
                 episode_idx += 1
                 print('total_reward received: {0}'.format(total_rewards))
-                self._history_buffer.clean_up()
-                state = self._request_new_episode()
+                history_buffer.clean_up()
+                state = self._request_new_episode(env)
                 total_rewards = 0
 
     
@@ -185,7 +189,8 @@ class A3CAgent:
         self._tf_sess = tf.Session(config=config)
         
         placeholders, ops, variables = A3CNet.build_actor_critic_network(self._num_actions)
-        self._tf_acn_state, self._tf_acn_action, self._tf_acn_q_value, self._tf_acn_advantage, self._tf_reward_history = placeholders
+        self._tf_global_step, self._tf_acn_state, self._tf_acn_action, \
+        self._tf_acn_q_value, self._tf_acn_advantage, self._tf_reward_history = placeholders
         self._tf_acn_train_op, self._tf_sample_action = ops
         self._tf_acn_actor_logits, self._tf_acn_critic_value, self._tf_average_reward = variables
         self._saver = saver = tf.train.Saver()
@@ -212,7 +217,6 @@ class A3CAgent:
             action = random.randrange(0, self._num_actions)
         else:
             if test_mode:
-                # need to modify it
                 action = np.argmax(self._tf_sess.run(self._tf_acn_actor_logits, {self._tf_acn_state: state[np.newaxis, :]})[0])
             else:
                 action = self._tf_sess.run(self._tf_sample_action, {self._tf_acn_state: state[np.newaxis, :]})[0][0]

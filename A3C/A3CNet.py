@@ -12,6 +12,10 @@ def build_actor_critic_network(num_action):
     with tf.variable_scope('actor_critic_network'):
         # Inputs
         with tf.name_scope('inputs'):
+            global_step = tf.placeholder(
+                name = 'global_step', 
+                shape = None,
+                dtype = tf.int32)
             state_placeholder = tf.placeholder(
                 name='state', 
                 shape=(None, 84, 84, 4), 
@@ -55,15 +59,23 @@ def build_actor_critic_network(num_action):
                 labels = action_placeholder,
                 logits = actor_logits)
             policy_loss = - tf.reduce_sum(log_prob * advantage_placeholder) / A3CConfig.batch_size
+            #policy_loss = - tf.reduce_sum(log_prob * (q_value_placeholder - state_value)) / A3CConfig.batch_size
             policy_entropy = - tf.reduce_sum(policy_probs * tf.log(policy_probs + 1e-15)) / A3CConfig.batch_size
             # value_loss
             value_loss = tf.reduce_sum(tf.square(q_value_placeholder - state_value)) / A3CConfig.batch_size
             # need to tweak weight
-            loss = policy_loss + 0.5 * value_loss - 0.0005 * policy_entropy
+            loss = policy_loss + 0.5 * value_loss # - 0.001 * policy_entropy
             
         # train_op
-        optimizer = tf.train.AdamOptimizer(
-            learning_rate = A3CConfig.lr)
+        """
+        learning_rate = tf.train.exponential_decay(
+            learning_rate = A3CConfig.learning_rate, 
+            global_step   = global_step, 
+            decay_steps   = A3CConfig.decay_step,
+            decay_rate    = A3CConfig.decay_rate)
+        """
+        #optimizer = tf.train.AdamOptimizer(learning_rate = A3CConfig.learning_rate)
+        optimizer = tf.train.RMSPropOptimizer(learning_rate = A3CConfig.learning_rate, momentum = A3CConfig.momentum)
         
         """
         grad_var = optimizer.compute_gradients(loss)
@@ -91,6 +103,6 @@ def build_actor_critic_network(num_action):
             tf.summary.scalar('value_loss', value_loss)
             tf.summary.scalar('loss', loss)
 
-    return (state_placeholder, action_placeholder, q_value_placeholder, advantage_placeholder, reward_history_placeholder), \
+    return (global_step, state_placeholder, action_placeholder, q_value_placeholder, advantage_placeholder, reward_history_placeholder), \
            (train_op, sample_action), (actor_logits, state_value, average_reward)
 

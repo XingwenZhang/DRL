@@ -33,7 +33,7 @@ class HistoryBuffer:
     def compute_q_value_and_advantages(self, value):
         N = len(self._reward_buffer)
         # compute q-values
-        q_value = np.zeros_like(N)
+        q_value = np.zeros(N)
         value *= self._discount_factor
         for t in reversed(xrange(N)):
             value += self._reward_buffer[t]
