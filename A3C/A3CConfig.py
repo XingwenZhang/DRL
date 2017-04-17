@@ -4,7 +4,7 @@ import tensorflow as tf
 num_threads = 8
 
 # max iterations for training (-1 means forever)
-max_iterations = 10000000
+max_iterations = 1000000
 
 # discounted factor
 discounted_factor = 0.99
@@ -19,9 +19,9 @@ momentum = 0.8
 decay = 0.99
 
 # epsilon greedy exploration
-initial_exploration = 1.0
-final_exploration = 0.5
-final_exploration_frame = 1000000
+initial_exploration = 0.8
+final_exploration = 0.0
+final_exploration_frame = 100000
 exploration_change_rate = (final_exploration - initial_exploration)/final_exploration_frame
 test_exploration = 0.0
 
@@ -32,7 +32,7 @@ num_history_frames = 4
 frame_size = (84, 84)
 
 # max_step, max number of step
-max_steps = 20
+max_steps = 32
 
 # batch_size
 batch_size = 1
