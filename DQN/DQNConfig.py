@@ -46,3 +46,10 @@ target_network_update_freq = 10000
 
 # summary folder for tensor board
 summary_folder = './logs/'
+
+# hyper-parameters recommended by DRL course
+lr = 0.0001
+initial_exploration = 0.05
+final_exploration = 0.05
+final_exploration_frame = 1000000
+exploration_change_rate = (final_exploration - initial_exploration)/final_exploration_frame
