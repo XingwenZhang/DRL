@@ -56,7 +56,7 @@ class DQNAgent:
             self.load(model_load_path)
 
         # start new episode
-        self._request_new_episode()
+        self._request_new_episode(random_start=True)
 
         # first take some random actions to populate the replay memory before learning starts
         if model_load_path is None:
@@ -66,7 +66,7 @@ class DQNAgent:
                     print('{0}/{1}'.format(i, DQNConfig.replay_start_size))
                 done = self._perform_random_action()
                 if done:
-                    self._request_new_episode()
+                    self._request_new_episode(random_start=True)
 
         print('Training started, please open Tensorboard to monitor the training process.')
         episode_count=0
@@ -95,7 +95,7 @@ class DQNAgent:
                                                            feed_dict={self._tf_episode_reward: episode_reward})
                 summary_writer.add_summary(summary_episode_reward, global_step=episode_count)
                 episode_count += 1
-                self._request_new_episode()
+                self._request_new_episode(random_start=True)
 
 
             # sample mini-batch and perform training
@@ -190,8 +190,11 @@ class DQNAgent:
         self._replay_memory.add(action, reward, observation, done)
         return done
 
-    def _request_new_episode(self):
-        observation = self._env.reset()
+    def _request_new_episode(self, random_start=False):
+        if random_start:
+            observation = self._env.reset_random()
+        else:
+            observation = self._env.reset()
         observation = DQNAgent.preprocess_frame(observation)
         assert(observation is not None)
         self._histroy_frames.fill_with(observation)

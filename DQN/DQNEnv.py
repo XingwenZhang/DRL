@@ -3,7 +3,8 @@
 
 import gym
 import numpy as np
-import DQNConfig
+import DQNConfig as config
+import random
 
 
 class DQNEnvironment:
@@ -18,7 +19,7 @@ class DQNEnvironment:
         # the agent only sees and select action on every k frame (the last action is repeated in the skipped frames)
         accumulated_reward = 0
         if self._frame_skipping:
-            skip_interval = DQNConfig.frame_skip_interval
+            skip_interval = config.frame_skip_interval
         else:
             skip_interval = 1
         for i in range(skip_interval):
@@ -35,6 +36,14 @@ class DQNEnvironment:
         observation = self._env.reset()
         self._done = False
         self._total_episode_reward = 0
+        return observation
+
+    def reset_random(self):
+        observation = self.reset()
+        for _ in range(random.randrange(0, config.random_start-1)):
+            observation, _, done, _ = self._env.step(action=random.randrange(0, self.get_num_actions()))
+            if done:
+                observation = self.reset()
         return observation
 
     def render(self):
