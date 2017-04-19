@@ -15,8 +15,8 @@ class DQNAgent:
     """
     def __init__(self, env):
         self._env = env
-        self._replay_memory = DQNUtil.ExperienceReplayMemory(DQNConfig.replay_memory)
-        self._histroy_frames = DQNUtil.FrameHistoryBuffer(DQNConfig.frame_size, DQNConfig.num_history_frames)
+        self._replay_memory = DQNUtil.ExperienceReplayMemory()
+        self._histroy_frames = DQNUtil.FrameHistoryBuffer()
         self._tf_sess = None
 
         # tensors
@@ -184,13 +184,10 @@ class DQNAgent:
         return action
 
     def _perform_action(self, action):
-        prev_state = self._histroy_frames.copy_content()
-        observation, r, done = self._env.step(action)
+        observation, reward, done = self._env.step(action)
         observation = DQNAgent.preprocess_frame(observation)
         self._histroy_frames.record(observation)
-        s = self._histroy_frames.copy_content()
-        experience = (prev_state, action, s, r, done)
-        self._replay_memory.add(experience)
+        self._replay_memory.add(action, reward, observation, done)
         return done
 
     def _request_new_episode(self):

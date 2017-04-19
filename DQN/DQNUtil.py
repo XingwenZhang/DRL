@@ -1,13 +1,15 @@
 import random
 import cPickle as pickle
 import numpy as np
+import DQNConfig as config
 from collections import deque
 
 
 class FrameHistoryBuffer:
     """ frame history buffer maintains a fixed number of history frames
     """
-    def __init__(self, image_size, buffer_size):
+    def __init__(self):
+        image_size, buffer_size = config.frame_size, config.num_history_frames
         assert buffer_size > 0
         assert len(image_size) == 2
         self._buffer = np.zeros((image_size[0], image_size[1], buffer_size))
@@ -60,10 +62,23 @@ class FrameHistoryBuffer:
 class ExperienceReplayMemory:
     """ Experience Replay Memory used in DQN
     """
-    def __init__(self, capacity):
-        self._memory = deque()
+    def __init__(self):
+        self._observations = np.empty((config.replay_memory, config.frame_size[0], config.frame_size[1]), dtype=np.float16)
+        self._actions = np.empty((config.replay_memory,), dtype=np.uint8)
+        self._rewards = np.empty((config.replay_memory,), dtype=np.int8)
+        self._dones = np.empty((config.replay_memory,), dtype=np.bool)
         self._count = 0
-        self._capacity = capacity
+        self._capacity = config.replay_memory
+        self._cur_idx = -1
+
+    def _get_state(self, idx):
+        assert idx < self._count, 'observation at index {0} does not exist'.format(idx)
+        if idx < config.num_history_frames - 1:
+            assert self._count == self._capacity, 'not enough history frames available to construct a state at index {0}'.format(idx)
+            state = np.array([self._observations[(idx - i) % self._capacity] for i in range(config.num_history_frames)])
+        else:
+            state = np.flip(self._observations[idx - config.num_history_frames + 1: idx + 1], axis=0)
+        return np.transpose(state, (1, 2, 0))
 
     def sample(self, size=1):
         result = []
@@ -71,15 +86,15 @@ class ExperienceReplayMemory:
             result.append(self._sample_single())
         return result
 
-    def add(self, experience):
-        if self._count == self._capacity:
-            self._memory.popleft()
-            self._count -= 1
-        self._memory.append(experience)
-        self._count += 1
+    def add(self, action, reward, new_observation, done):
+        self._cur_idx = (self._cur_idx + 1) % self._capacity
+        self._count = min(self._count + 1, self._capacity)
+        self._observations[self._cur_idx] = new_observation
+        self._actions[self._cur_idx] = action
+        self._rewards[self._cur_idx] = reward
+        self._dones[self._cur_idx] = done
 
     def clear(self):
-        self._memory.clear()
         self._count = 0
 
     def get_capacity(self):
@@ -91,20 +106,51 @@ class ExperienceReplayMemory:
     def save(self, file_path):
         f = open(file_path, 'wb')
         dump = {}        
-        dump['memory'] = self._memory
+        dump['observations'] = self._observations
+        dump['actions'] = self._actions
+        dump['rewards'] = self._rewards
+        dump['dones'] = self._dones
         dump['count'] = self._count
         dump['capacity'] = self._capacity
+        dump['cur_idx'] = self._cur_idx
         pickle.dump(dump, f)
 
     def load(self, file_path):
         f = open(file_path, 'rb')
         dump = pickle.load(f)        
-        self._memory = dump['memory']
+        self._observations = dump['observations']
+        self._actions = dump['actions']
+        self._rewards = dump['rewards']
+        self._dones = dump['dones']
         self._count = dump['count']
         self._capacity = dump['capacity']
+        self._cur_idx = dump['cur_idx']
 
     def _sample_single(self):
-        idx = random.randrange(0, self._count)
-        return self._memory[idx]
+        # uniformly sample a valid index
+        if self._count < self._capacity:
+            idx = random.randrange(config.num_history_frames, self._count)
+        else:
+            while True:
+                idx = random.randrange(0, self._count)
+                if (self._cur_idx + 1) <= idx <= (self._cur_idx + config.num_history_frames):
+                    continue
+                break
+
+        prev_state = self._get_state(idx-1)
+        action = self._actions[idx]
+        reward = self._rewards[idx]
+        done = self._dones[idx]
+        new_state = self._get_state(idx)
+        experience = (prev_state, action, new_state, reward, done)
+        return experience
+
+
+
+
+
+
+
+
 
 

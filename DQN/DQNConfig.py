@@ -33,12 +33,10 @@ weight_initializer = tf.truncated_normal
 frame_skip_interval = 4
 
 # experience reply memory size
-# replay_memory = 1000000
-replay_memory = 10000
+replay_memory = 1000000
 
 # number of random actions to take (to fill replay memory) before learning starts
-# replay_start_size = 50000
-replay_start_size = 500
+replay_start_size = 50000
 
 # the frequency with which the target network is updated
 target_network_update_freq = 10000
