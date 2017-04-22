@@ -1,18 +1,8 @@
-#multiple graphs
-#https://www.quora.com/How-does-one-create-separate-graphs-in-TensorFlow
-#http://stackoverflow.com/questions/35955144/working-with-multiple-graphs-in-tensorflow
+import skimage.io  
+import skimage.transform  
 import tensorflow as tf
-import skimage.io  # bug. need to import this before tensorflow
-import skimage.transform  # bug. need to import this before tensorflow
-import tensorflow as tf
-from tensorflow.python.ops import control_flow_ops
-from tensorflow.python.training import moving_averages
-
-import datetime
 import numpy as np
 import os
-import time
-
 
 
 FC_WEIGHT_STDDEV = 0.01
@@ -53,7 +43,7 @@ def _get_variable(name,
 
 
 #Define the fc layer to take feature vectore from pretrained ResNet
-def fc(x, num_units_out=512):
+def fc(x, num_units_out):
     
     num_units_in = x.get_shape()[1]
     weights_initializer = tf.truncated_normal_initializer(
@@ -82,52 +72,44 @@ def run_graph(train_dir='2graph_4img_logs'):
   saver.restore(sess, path_model2)
   graph = tf.get_default_graph()
 
-  #4 images, corresponds to the 4 observation frames
-  img1 = load_image("room.jpg")
-  img2 = load_image("room.jpg")
-  img3 = load_image("room.jpg")
-  img4 = load_image("room.jpg")
-
-
-  #target image
-  img5 = load_image("room.jpg")
-  img5 = img5.reshape((1,224, 224, 3))
-  
   #Pretrained resnet to take in the 4 observation frames
   with tf.variable_scope("fc1"):
     #Take the 2048d feature from pretrained ResNet
-    output_conv =graph.get_tensor_by_name('avg_pool:0')
+    output_conv1 =graph.get_tensor_by_name('avg_pool:0')
     #Tensor to save input image 
-    images = graph.get_tensor_by_name("images:0")
+    images1 = graph.get_tensor_by_name("images:0")
     #This tensor is supposed freeze and store the ResNet parameters, not sure...
-    output_conv_sg = tf.stop_gradient(output_conv) 
+    output_conv_sg1 = tf.stop_gradient(output_conv1) 
+    # 1x2048 feature vector -->fc layer --> 1x512
+    fc1_out = fc(output_conv_sg1, 512)
 
   #Pretrained resenet to take in the target location image  
   with tf.variable_scope("fc2"):
     output_conv2=graph.get_tensor_by_name('avg_pool:0')
     images2 = graph.get_tensor_by_name("images:0")
     output_conv_sg2 = tf.stop_gradient(output_conv2) 
+    fc2_out = fc(output_conv_sg2, 512)
 
-  #Input 4 observations and the 1 target frame
-  output_1 = sess.run([output_conv_sg], feed_dict={images: [img1,img2,img3,img4]})
-  output_2 = sess.run([output_conv_sg2], feed_dict={images:img5})
-  #Convert list format output_1, output_2 to tensor
-  output_1_tf = tf.stack(output_1)
-  output_2_tf = tf.stack(output_2)
-  #Reshape from 1x1x2048 to 1x2048
-  output_1_tf = tf.reshape(output_1_tf,[1,-1])
-  output_2_tf = tf.reshape(output_2_tf,[1,-1])
-  # 1x2048 feature vector -->fc layer --> 1x512
-  with tf.variable_scope("fc1"):
-    fc_output = fc(output_1_tf, 512)
-  with tf.variable_scope("fc2"):
-    fc_output2 = fc(output_2_tf, 512)
   #concatenate the two outputs from fc1 and fc2, pass through fc3
   with tf.variable_scope("fc3"):
-    fc_concat = tf.concat([fc_output , fc_output2],1)
-    fc_3 = fc(fc_concat,512)
+    fc3_in = tf.concat([fc1_out , fc2_out],1)
+    fc3_out = fc(fc3_in,512)
+  #policy(4)
+  with tf.variable_scope("fc4_policy"):
+    fc4_policy_out = fc(fc3_out,4)
+  #value(1)
+  with tf.variable_scope("fc5_value"):
+    fc5_value_out = fc(fc3_out,1)
+  
 
+
+  #TODO: add action and vallue, end to end, return action&value
   train_writer = tf.summary.FileWriter(train_dir,
                                       sess.graph)
-
+#TODO: question-- how to define the input image for the graph? how to connect fc3 to action?
 run_graph()
+
+
+
+
+
