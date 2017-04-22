@@ -17,6 +17,7 @@ class DQNEnvironment:
 
     def step(self, action):
         # the agent only sees and select action on every k frame (the last action is repeated in the skipped frames)
+        start_lives = self._env.unwrapped.ale.lives()
         accumulated_reward = 0
         if self._frame_skipping:
             skip_interval = config.frame_skip_interval
@@ -29,8 +30,15 @@ class DQNEnvironment:
                 self._env.render()
             if self._done:
                 break
+        end_lives = self._env.unwrapped.ale.lives()
+        if config.life_drop_penalty:
+            if end_lives < start_lives:
+                accumulated_reward -= 1
+        if config.reward_clipping:
+            accumulated_reward = np.clip(accumulated_reward, -1, 1)
+
         self._total_episode_reward += accumulated_reward
-        return observation, reward, self._done
+        return observation, accumulated_reward, self._done
 
     def reset(self):
         observation = self._env.reset()
