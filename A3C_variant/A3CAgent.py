@@ -99,22 +99,21 @@ class A3CAgent:
     def learner_thread(self, thread_id):
         env = self._envs[thread_id]
         state = self._request_new_episode(env)
-        history_buffer = A3CUtil.HistoryBuffer()
+        history_buffer = A3CUtil.HistoryBuffer(max_step = A3CConfig.max_steps)
         total_rewards = 0
+
+
         while self._iter_idx < A3CConfig.max_iterations:
-            for _ in xrange(A3CConfig.max_steps):
-                # sample and perform action, store history
-                action = self._select_action(state, self._iter_idx)
-                next_state, reward, done = self._perform_action(env, state, action, history_buffer)
-                total_rewards += reward
-                state = next_state
-                #if reward != 0: # Pong has either +1 or -1 reward exactly when game ends.
-                #    print (('ep %d: game finished, reward: %f' % (episode_idx + 1, reward)) + ('' if reward == -1 else ' !!!!!!!!'))
-                if done:
-                    break
+            # sample and perform action, store history
+            action = self._select_action(state, self._iter_idx)
+            next_state, reward, done = self._perform_action(env, state, action, history_buffer)
+            total_rewards += reward
+            state = next_state
             
+            #if reward != 0: # Pong has either +1 or -1 reward exactly when game ends.
+            #    print (('ep %d: game finished, reward: %f' % (episode_idx + 1, reward)) + ('' if reward == -1 else ' !!!!!!!!'))
+
             if done:
-                value = 0
                 # reset
                 state = self._request_new_episode(env)
                 # save episode reward
@@ -122,32 +121,34 @@ class A3CAgent:
                 print("Reward for this episode: {}".format(total_rewards))
                 print("Average reward for last 100 episodes: {}".format(np.mean(self._episode_reward_buffer)))
                 total_rewards = 0
-            else:
-                value = self._tf_sess.run(self._tf_acn_critic_value, feed_dict = {self._tf_acn_state: state[np.newaxis, :]})[0]
+                
+
+                # start to train if number of episodes reaches batch size
+                if self._iter_idx % A3CConfig.batch_size == 0: 
+                    # update models
+                    states = history_buffer._state_buffer
+                    actions = history_buffer._action_buffer
+                    q_values, advantages = history_buffer.compute_q_value_and_advantages()
                     
 
-            # update models
-            states = history_buffer._state_buffer
-            actions = history_buffer._action_buffer
-            q_values, advantages = history_buffer.compute_q_value_and_advantages(value)
-            
-            _, average_reward, summary = \
-            self._tf_sess.run([self._tf_acn_train_op, self._tf_average_reward, self._tf_summary_op],
-                              feed_dict={self._tf_global_step: self._iter_idx,
-                                         self._tf_acn_state: states,
-                                         self._tf_acn_action: actions,
-                                         self._tf_acn_q_value: q_values,
-                                         self._tf_acn_advantage: advantages,
-                                         self._tf_reward_history: self._episode_reward_buffer
-                                        })
-            history_buffer.clean_up()
-
-            # record summary
-            self._summary_writer.add_summary(summary, global_step=self._iter_idx)
-            self._iter_idx += 1
-            if self._iter_idx % self._model_save_freq == 0 or self._iter_idx == A3CConfig.max_iterations:
-                print("Model saved after {} iterations".format(self._iter_idx))
-                self.save(self._model_save_path, global_step = self._iter_idx)
+                    _, average_reward, summary = \
+                    self._tf_sess.run([self._tf_acn_train_op, self._tf_average_reward, self._tf_summary_op],
+                                    feed_dict={self._tf_global_step: self._iter_idx,
+                                                self._tf_acn_state: states,
+                                                self._tf_acn_action: actions,
+                                                self._tf_acn_q_value: q_values,
+                                                self._tf_acn_advantage: advantages,
+                                                self._tf_reward_history: self._episode_reward_buffer
+                                                })
+                    history_buffer.clean_up()
+         
+                    # record summary
+                    self._summary_writer.add_summary(summary, global_step=self._iter_idx)
+                
+                self._iter_idx += 1
+                if self._iter_idx % self._model_save_freq == 0 or self._iter_idx == A3CConfig.max_iterations:
+                    print("Model saved after {} iterations".format(self._iter_idx))
+                    self.save(self._model_save_path, global_step = self._iter_idx)
 
 
     def test(self, check_point, use_gpu, gpu_id=None):

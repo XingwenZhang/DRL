@@ -17,8 +17,8 @@ if __name__ == '__main__':
                         help='path to save/load the model for training/testing (default to model/actor_critic_model.ckpt)')
     parser.add_argument('--check_point', type=int, default=None,
                         help='index of the ckeck point (default to None)')
-    parser.add_argument('--model_save_freq', type=int, default=5000,
-                        help='dump model at every k-th iteration (default to 5000)')
+    parser.add_argument('--model_save_freq', type=int, default=500,
+                        help='dump model at every k-th iteration (default to 1000)')
     parser.add_argument('--display', type=bool, default=False,
                         help='whether to render to result. (default to False)')
     parser.add_argument('--num_threads', type=int, default=4,

@@ -60,7 +60,7 @@ def build_actor_critic_network(num_action):
                 logits = actor_logits)
             policy_loss = - tf.reduce_sum(log_prob * advantage_placeholder) / A3CConfig.batch_size
             #policy_loss = - tf.reduce_sum(log_prob * (q_value_placeholder - state_value)) / A3CConfig.batch_size
-            policy_entropy = - 0.005 * tf.reduce_sum(policy_probs * tf.log(policy_probs + 1e-15)) / A3CConfig.batch_size
+            policy_entropy = - 0.5 * tf.reduce_sum(policy_probs * tf.log(policy_probs + 1e-15)) / A3CConfig.batch_size
             # value_loss
             value_loss = 0.5 * tf.reduce_sum(tf.square(q_value_placeholder - state_value)) / A3CConfig.batch_size
             # need to tweak weight
