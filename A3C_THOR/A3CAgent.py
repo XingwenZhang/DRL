@@ -5,12 +5,13 @@ import tensorflow as tf
 import numpy as np
 
 from THOR import THORConfig
-from THOR import TFUtil
-from THOR import THORNet
+import TFUtil
+import THORNet
 from THOR.THOREnv import THOREnvironment
 
 import A3CUtil
 import A3CConfig
+import ImgUtil
 import threading
 
 from collections import deque
@@ -78,7 +79,7 @@ class A3CAgent:
             # initialize or load network variables
             if check_point is None:
                 self._tf_sess.run(init)
-                self._saver.restore(self._tf_sess, THORConfig.resnet_pretrain_model)
+                self._saver.restore(self._tf_sess, A3CConfig.resnet_pretrain_model)
                 self._iter_idx = 0
             else:
                 self.load(self._model_save_path, check_point)
@@ -207,7 +208,7 @@ class A3CAgent:
         self._tf_sess = tf.Session(config=config)
 
         # load model from meta graph
-        saver = tf.train.import_meta_graph(THORConfig.resnet_meta_graph)
+        saver = tf.train.import_meta_graph(A3CConfig.resnet_meta_graph)
         graph = tf.get_default_graph()
         
         # get the nodes of input images and output features
@@ -252,7 +253,7 @@ class A3CAgent:
 
     def _perform_action(self, env, state, action, history_buffer):
         # perfrom action and get next frame
-        next_frame, reward, done = env.step(action)
+        next_frame, _, reward, done = env.step(action)
         # get the value of the current state
         value = self._tf_sess.run(
             self._tf_acn_state_value_list[env._env_idx],
@@ -262,7 +263,7 @@ class A3CAgent:
         # get next state using current state and next frame
         next_frame = self.preprocess_frame(next_frame)[np.newaxis, :, :, :]
         next_state = np.concatenate(
-            (state[1:THORConfig.num_history_frame, :, :, :], next_frame, state[-1, :, :, :]),
+            (state[1:A3CConfig.num_history_frames, :, :, :], next_frame, state[-1:, :, :, :]),
             axis = 0)
         return next_state, reward, done
 
@@ -270,7 +271,7 @@ class A3CAgent:
         frame = self.preprocess_frame(env.reset_random())
         if len(frame.shape) == 3:
             frame = frame[np.newaxis, :, :, :]
-        state = np.tile(frame, (THORConfig.num_history_frames, 1, 1, 1))
+        state = np.tile(frame, (A3CConfig.num_history_frames, 1, 1, 1))
         target = self.preprocess_frame(env._target_img)[np.newaxis, :, :, :]
         state = np.concatenate((state, target), axis = 0)
         return state

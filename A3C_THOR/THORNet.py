@@ -4,7 +4,8 @@ functions for creating different network architectures.
 
 import tensorflow as tf
 import TFUtil
-import THORConfig
+import A3CConfig
+from THOR import THORConfig
 import math
 
 
@@ -39,11 +40,11 @@ def build_actor_critic_network(input_feature, num_action, num_scene):
             fc1 = TFUtil.fc_layer('fc1', tf.stop_gradient(input_feature), input_size=2048, num_neron=512, variable_dict=variable_dict)
             fc1_flattened = tf.reshape(
                 fc1, 
-                shape = (-1, (THORConfig.num_history_frames+1) * 512),
+                shape = (-1, (A3CConfig.num_history_frames+1) * 512),
                 name = "fc1_flattened") # (num_histroy_frmae + 1) * n * 512 -> n * (num_histroy_frmae * 512)
-            state_feature = fc1_flattened[:, 0:(THORConfig.num_history_frames * 512)]
+            state_feature = fc1_flattened[:, 0:(A3CConfig.num_history_frames * 512)]
             state_feature = TFUtil.fc_layer('state_feature', state_feature, input_size=2048, num_neron=512, variable_dict=variable_dict)
-            target_feature = fc1_flattened[:, (THORConfig.num_history_frames * 512):]
+            target_feature = fc1_flattened[:, (A3CConfig.num_history_frames * 512):]
             embedded_feature = TFUtil.fc_layer('embedded_feature',
                                                tf.concat((state_feature, target_feature), axis = 1), 
                                                input_size=1024, num_neron=512, variable_dict=variable_dict)
@@ -97,7 +98,10 @@ def build_actor_critic_network(input_feature, num_action, num_scene):
         
         # optional: gradient clipping
         grad_var = optimizer.compute_gradients(loss)
-        clipped_grad_var = [(tf.clip_by_value(grad, -10., 10.), var) for grad, var in grad_var]
+        clipped_grad_var = []
+        for grad, var in grad_var:
+            if grad is not None:
+                clipped_grad_var.append((tf.clip_by_value(grad, -10., 10.), var))
         train_op = optimizer.apply_gradients(clipped_grad_var)
         #train_op = optimizer.minimize(loss)
 
