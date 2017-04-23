@@ -28,7 +28,7 @@ target_image_diff_threshold = 10
 targets_per_scene = 100
 
 # directory where target images are stored
-target_images_folder = 'target_images'
+target_images_folder = THOR_HOME + '/target_images'
 
 # random actions being taken when new episode is started
 random_start = 30  # TODO: check the value used in paper
