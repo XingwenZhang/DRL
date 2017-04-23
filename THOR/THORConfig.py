@@ -17,13 +17,22 @@ supported_envs = ['FloorPlan224', 'FloorPlan225']
 supported_actions = ['MoveAhead', 'MoveBack', 'RotateLeft', 'RotateRight']
 # supported_actions = ['MoveAhead', 'MoveBack', 'MoveRight', 'MoveLeft', 'RotateLeft', 'RotateRight', 'LookUp', 'LookDown']
 
-# THORTargetImgProvider configurations
-target_image_diff_threshold=10
+# under what threshold we think two images are identical
+target_image_diff_threshold = 10
+
+# number of randomly sampled targets per scene
+targets_per_scene = 100
+
+# directory where target images are stored
+target_images_folder = 'target_images'
 
 # random actions being taken when new episode is started
 random_start = 30  # TODO: check the value used in paper
 
 # maximum number of steps before the episode terminates
 episode_max_steps = 10000
+
+# for debugging
+episode_max_steps = 10000000
 
 
