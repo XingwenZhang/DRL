@@ -14,6 +14,7 @@ class THOREnvironment:
                                                x_display=config.x_display)
         self._done = True
         self._total_episode_reward = 0
+        self._env_idx = None
         self._env_name= None
         self._target_idx = None
         self._target_img = None
@@ -40,6 +41,7 @@ class THOREnvironment:
     def reset(self, env_idx=None, target_idx=None):
         assert(self._done)
         if env_idx == None:
+            env_idx = self._env_idx
             env_name = self._env_name
         else:
             assert(0 <= env_idx < len(config.supported_envs))
@@ -48,6 +50,7 @@ class THOREnvironment:
             target_idx = self._target_idx
         assert(env_name is not None)
         assert(target_idx is not None)
+        self._env_idx = env_idx
         self._env_name = env_name
         self._target_idx = target_idx
         self._target_img = self._target_img_mgr.get_target_image(self._env_name, self._target_idx)
@@ -71,9 +74,13 @@ class THOREnvironment:
     def get_num_targets(self):
         return config.targets_per_scene
 
-    def get_env_name():
+    def get_env_name(self):
         assert(self._env_name is not None)
         return self._env_name
+
+    def get_env_idx(self):
+        assert(self._env_idx is not None)
+        return self._env_idx
 
     def get_target_image(self):
         assert(self._target_img is not None)

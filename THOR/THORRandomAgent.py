@@ -17,6 +17,10 @@ print('number of actions: ' + str(num_actions))
 print('number of targets: ' + str(num_targets))
 
 thor_env.reset_random()
+
+print('cur_env_idx: ' + str(thor_env.get_env_idx()))
+print('cur_env_name: ' + thor_env.get_env_name())
+
 current_target = thor_env.get_target_image()
 skimage.io.imsave('target.png', current_target)
 while True:
