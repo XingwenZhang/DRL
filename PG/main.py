@@ -17,7 +17,7 @@ if __name__ == '__main__':
                         help='path to save/load the model for training/testing (default to model/PG_model.ckpt)')
     parser.add_argument('--check_point', type=int, default=None,
                         help='index of the ckeck point (default to None)')
-    parser.add_argument('--model_save_freq', type=int, default=10,
+    parser.add_argument('--model_save_freq', type=int, default=100,
                         help='dump model at every k-th iteration (default to 100)')
     parser.add_argument('--display', type=bool, default=False,
                         help='whether to render to result. (default to False)')
@@ -32,7 +32,7 @@ if __name__ == '__main__':
     else:
         # disable frame skipping during testing result in better performance (because the agent can take more actions)
         env = PGEnvironment(environment_name=args.gym_environment, display=args.display, frame_skipping=False)
-        agent = PFAgent(env)
+        agent = PGAgent(env)
         assert(args.check_point is not None)
         agent.test(model_save_path = args.model_save_path, check_point=args.check_point,
                    use_gpu=args.use_gpu, gpu_id=args.gpu_id)

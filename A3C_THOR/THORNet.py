@@ -30,18 +30,20 @@ def build_actor_critic_network(input_feature, num_action, num_scene):
                 dtype = tf.float32)
             scene_placeholder = tf.placeholder(
                 name = 'current_scene',
-                shape = (None, ),
-                dtype = tf.int32
-            )
+                shape = (None, num_scene),
+                dtype = tf.float32)
 
         # compute embedded feature given the input image feature
         variable_dict = {}
         with tf.variable_scope('shared_layers'):
             fc1 = TFUtil.fc_layer('fc1', tf.stop_gradient(input_feature), input_size=2048, num_neron=512, variable_dict=variable_dict)
-            fc1_flattened = tf.reshape(fc1, shape (-1, 2560), name = "fc1_flattened") # 5n * 512 -> n * 2560
-            state_feature = input_feature_flattened[:, 0:2048]
+            fc1_flattened = tf.reshape(
+                fc1, 
+                shape = (-1, (THORConfig.num_history_frames+1) * 512),
+                name = "fc1_flattened") # (num_histroy_frmae + 1) * n * 512 -> n * (num_histroy_frmae * 512)
+            state_feature = fc1_flattened[:, 0:(THORConfig.num_history_frames * 512)]
             state_feature = TFUtil.fc_layer('state_feature', state_feature, input_size=2048, num_neron=512, variable_dict=variable_dict)
-            target_feature = input_feature_flattened[:, 2048:]
+            target_feature = fc1_flattened[:, (THORConfig.num_history_frames * 512):]
             embedded_feature = TFUtil.fc_layer('embedded_feature',
                                                tf.concat((state_feature, target_feature), axis = 1), 
                                                input_size=1024, num_neron=512, variable_dict=variable_dict)
@@ -50,9 +52,9 @@ def build_actor_critic_network(input_feature, num_action, num_scene):
         policy_logits_list = []
         policy_prob_list = []
         state_value_list = []
-        with tf.variable('scene_specific_layers'):
+        with tf.variable_scope('scene_specific_layers'):
             for i in xrange(num_scene):
-                with ('scene_%02i' %(i)):
+                with tf.variable_scope('scene_%02i' %(i)):
                     with tf.variable_scope('policy_network'):
                         policy_fc = TFUtil.fc_layer('policy_fc', embedded_feature, input_size=512, num_neron=512, variable_dict=variable_dict) 
                         policy_logits = TFUtil.fc_layer('policy_logits', policy_fc, input_size=512, num_neron=num_action, activation=None, variable_dict=variable_dict)
@@ -72,13 +74,13 @@ def build_actor_critic_network(input_feature, num_action, num_scene):
                     name   = 'log_prob',
                     labels = action_placeholder,
                     logits = policy_logits_list[i])
-                policy_loss = - tf.reduce_sum(log_prob * tf.stop_gradient(q_value_placeholder - state_value_list[i])) / A3CConfig.batch_size
-                policy_entropy = - 0.005 * tf.reduce_sum(policy_prob_list[i] * tf.log(policy_prob_list[i] + 1e-20)) / A3CConfig.batch_size
+                policy_loss = - tf.reduce_sum(log_prob * tf.stop_gradient(q_value_placeholder - state_value_list[i]))
+                policy_entropy = - 0.005 * tf.reduce_sum(policy_prob_list[i] * tf.log(policy_prob_list[i] + 1e-20))
                 # value_loss
-                value_loss = 0.5 * tf.reduce_sum(tf.square(q_value_placeholder - state_value_list[i])) / A3CConfig.batch_size
+                value_loss = 0.5 * tf.reduce_sum(tf.square(q_value_placeholder - state_value_list[i]))
                 # need to tweak weight
                 scene_loss.append(policy_loss + value_loss - policy_entropy)
-            loss = tf.reduce_sum(scene_loss * scene_placeholder) # scene_placeholder is a one hot vector
+            loss = tf.reduce_sum(tf.transpose(scene_loss) * scene_placeholder) # scene_placeholder is a one hot vector
             
         # train_op
         # optional: varying learning_rate
