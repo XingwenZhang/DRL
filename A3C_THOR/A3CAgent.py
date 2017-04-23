@@ -33,6 +33,7 @@ class A3CAgent:
         self._num_actions = len(THORConfig.supported_actions)
         self._episode_reward_buffer = deque(maxlen=100)
         self._episode_reward_buffer.append(0)
+        self._episode_step_buffer = deque(maxlen=100)
         
         #self._replay_memory = PGUtil.ExperienceReplayMemory(A3CConfig.replay_memory)
         #self._histroy_frames = PGUtil.FrameHistoryBuffer(A3CConfig.frame_size, A3CConfig.num_history_frames)
@@ -56,6 +57,9 @@ class A3CAgent:
         # variables
         self._tf_reward_history = None
         self._tf_average_reward = None
+        self._tf_step_history = None
+        self._tf_average_step = None
+        
         self._tf_summary_op = None
         self._summary_writer = None
 
@@ -111,8 +115,10 @@ class A3CAgent:
     def learner_thread(self, thread_id):
         env = self._envs[thread_id]
         state = self._request_new_episode(env)
+        print "Target idx:", env._target_idx
         history_buffer = A3CUtil.HistoryBuffer()
         total_rewards = 0
+        total_steps = 0
         while self._iter_idx < A3CConfig.max_iterations:
             for _ in xrange(A3CConfig.max_steps):
                 # sample and perform action, store history
@@ -122,6 +128,7 @@ class A3CAgent:
                 state = next_state
                 #if reward != 0: # Pong has either +1 or -1 reward exactly when game ends.
                 #    print (('ep %d: game finished, reward: %f' % (episode_idx + 1, reward)) + ('' if reward == -1 else ' !!!!!!!!'))
+                total_steps += 1
                 if done:
                     break
             
@@ -138,19 +145,24 @@ class A3CAgent:
             scene_one_hot[:, env._env_idx] = 1
 
             
-            _, average_reward, summary = \
-            self._tf_sess.run([self._tf_acn_train_op, self._tf_average_reward, self._tf_summary_op],
+            _, _, _, summary = \
+            self._tf_sess.run([self._tf_acn_train_op, self._tf_average_reward, self._tf_average_step, self._tf_summary_op],
                               feed_dict={self._tf_global_step: self._iter_idx,
                                          self._tf_acn_state     : states,
                                          self._tf_acn_action    : actions,
                                          self._tf_acn_q_value   : q_values,
                                          self._tf_acn_sence     : scene_one_hot,
-                                         self._tf_reward_history: self._episode_reward_buffer
+                                         self._tf_reward_history: self._episode_reward_buffer,
+                                         self._tf_step_history  : self._episode_step_buffer
                                         })
             history_buffer.clean_up()
 
             # reset environment if done
             if done: 
+                # save number of steps
+                self._episode_step_buffer.append(total_steps)
+                print("Number of steps for this episode: {}".format(total_steps))
+                print("Average number of steps for last 100 episodes: {}".format(np.mean(self._episode_step_buffer)))
                 # save episode reward
                 self._episode_reward_buffer.append(total_rewards)
                 print("Reward for this episode: {}".format(total_rewards))
@@ -217,9 +229,9 @@ class A3CAgent:
     
         placeholders, ops, variables = THORNet.build_actor_critic_network(self._tf_acn_image_feature, self._num_actions, self._num_scenes)
         self._tf_global_step, self._tf_acn_action, self._tf_acn_q_value, \
-        self._tf_acn_sence, self._tf_reward_history = placeholders
+        self._tf_acn_sence, self._tf_reward_history, self._tf_step_history = placeholders
         self._tf_acn_train_op, self._tf_action_samplers = ops
-        self._tf_acn_policy_logit_list, self._tf_acn_state_value_list, self._tf_average_reward = variables
+        self._tf_acn_policy_logit_list, self._tf_acn_state_value_list, self._tf_average_reward, self._tf_average_step = variables
         self._saver = saver
     
     def _evaluate_q(self, state):
