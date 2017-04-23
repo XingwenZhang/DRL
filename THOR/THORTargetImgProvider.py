@@ -3,6 +3,9 @@
 import os
 import THORConfig as config
 import skimage.io
+import skimage.transform
+import skimage.exposure
+import numpy as np
 import robosims.server
 import random
 
@@ -10,7 +13,7 @@ class THORTargetManager:
 	def __init__(self):
 		pass
 
-	def collect_target_images(self, env_name, dump_folder, suffix='.png'):
+	def collect_target_images(self, env_name, dump_folder, suffix='.png', num_images=100):
 		"""
 		Find all target images of the scene and save them to dump_folder
 		"""
@@ -21,38 +24,48 @@ class THORTargetManager:
                                          x_display=config.x_display)
 		env.start()
 		event = env.reset(env_name)
-		num_objects = len(event.metadata['objects'])
-		objects_found = [False] * num_objects
-		objects_found_count = 0
-		while (True):
-			event = env.step(dict(action=random.choice(config.supported_actions)))
-			objects = event.metadata['objects']
-			for i in range(num_objects):
-				obj = objects[i]
-				if obj['visible'] and not objects_found[i]:
-					objects_found[i] = True
-					objects_found_count += 1
-					file_path = os.path.join(dump_folder, obj['objectId']) + suffix
-					skimage.io.imsave(file_path, event.frame)
-					print('target image for ' + obj['objectId'] + ' saved.[{0}/{1}]'.format(objects_found_count, num_objects))
-					if objects_found_count == num_objects:
-						break
 
-		# finally dump the object id list
-		print('dumping object id list')
-		f = open(os.path.join(dump_folder, config.object_id_list_name), 'w')
-		for i in range(num_objects):
-			obj = objects[i]
-			f.write(obj['objectId'] + '\n')
-		f.close()
+		target_images = np.empty((num_images, config.net_input_height, config.net_input_width, 3))
+		i = 0
+		while True:
+			action = random.choice(config.supported_actions)
+			max_steps = 10 if action.startswith('Move') else 2
+			for _ in range(random.randrange(1, max_steps)):
+				event = env.step(dict(action=action))
+				success = event.metadata['lastActionSuccess']
+				if not success:
+					break
 
-		print('all target images in the environments are saved.')
+			# resize to network input size
+			target_image = skimage.transform.resize(event.frame, (config.net_input_height, config.net_input_width))
+
+			# check low contrast
+			if skimage.exposure.is_low_contrast(target_image):
+				print('low contrast!')
+				continue
+
+			# check duplication
+			if i !=0:
+				if (np.sum(np.abs(target_images[0:i] - target_image), axis=(1,2,3)) < config.target_image_diff_threshold).any():
+					continue
+			target_images[i] = target_image
+			i+=1
+			if i % 10==0:
+				print(str(i) + ' target images collected.')
+			if i == num_images:
+				break
+		del env
+
+		# dump images
+		for i in range(num_images):
+			skimage.io.imsave(os.path.join(dump_folder, str(i)+suffix), target_images[i])
 
 
 if __name__ == '__main__':
 	import argparse
 	parser = argparse.ArgumentParser()
-	parser.add_argument('--save_folder', default='taget_images')
+	parser.add_argument('--save_folder', default='target_images', type=str)
+	parser.add_argument('--num_images_per_env', default=10000, type=int)
 	args = parser.parse_args()
 	if not os.path.exists(args.save_folder):
 		os.mkdir(args.save_folder)
@@ -62,7 +75,7 @@ if __name__ == '__main__':
 		dump_folder = os.path.join(args.save_folder, env_name)
 		if not os.path.exists(dump_folder):
 			os.mkdir(dump_folder)
-		mgr.collect_target_images(env_name, dump_folder)
+		mgr.collect_target_images(env_name, dump_folder, num_images=args.num_images_per_env)
 	print('done.')
 
 
