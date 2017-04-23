@@ -8,8 +8,12 @@ screen_height=300
 net_input_width=224
 net_input_height=224
 
-darwin_build='thor_binary/thor-cmu-201703101557-OSXIntel64.app/Contents/MacOS/thor-cmu-201703101557-OSXIntel64'
-linux_build='thor_binary/thor-cmu-201703101558-Linux64'
+
+import os
+assert 'THOR_HOME' in os.environ, 'please first set env_var THOR_HOME as the absolute path of DRL/THOR'
+THOR_HOME=os.environ['THOR_HOME']
+darwin_build=THOR_HOME + '/thor_binary/thor-cmu-201703101557-OSXIntel64.app/Contents/MacOS/thor-cmu-201703101557-OSXIntel64'
+linux_build=THOR_HOME + '/thor_binary/thor-cmu-201703101558-Linux64'
 x_display="0.0"
 
 # supported environments and actions
