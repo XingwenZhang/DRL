@@ -4,11 +4,15 @@ functions for creating different network architectures.
 
 import tensorflow as tf
 import TFUtil
-import ThorConfig
+import THORConfig
 import math
 
 
 def build_actor_critic_network(input_feature, num_action, num_scene):
+    # input: 
+    #   input_feature: the node of pretrain resnet ave_pool feature, size should be (5n, 2048)
+    #   num_action   : number of available actions
+    #   num_scene    : number of available scene ### maybe better to use list of scene names?
     with tf.variable_scope('actor_critic_network'):
         # Inputs
         with tf.name_scope('inputs'):
@@ -34,7 +38,7 @@ def build_actor_critic_network(input_feature, num_action, num_scene):
         variable_dict = {}
         with tf.variable_scope('shared_layers'):
             fc1 = TFUtil.fc_layer('fc1', tf.stop_gradient(input_feature), input_size=2048, num_neron=512, variable_dict=variable_dict)
-            fc1_flattened = tf.reshape(fc1, size(-1, 2560), name = "fc1_flattened") # 5n * 512 -> n * 2560
+            fc1_flattened = tf.reshape(fc1, shape (-1, 2560), name = "fc1_flattened") # 5n * 512 -> n * 2560
             state_feature = input_feature_flattened[:, 0:2048]
             state_feature = TFUtil.fc_layer('state_feature', state_feature, input_size=2048, num_neron=512, variable_dict=variable_dict)
             target_feature = input_feature_flattened[:, 2048:]
@@ -77,6 +81,7 @@ def build_actor_critic_network(input_feature, num_action, num_scene):
             loss = tf.reduce_sum(scene_loss * scene_placeholder) # scene_placeholder is a one hot vector
             
         # train_op
+        # optional: varying learning_rate
         """
         learning_rate = tf.train.exponential_decay(
             learning_rate = A3CConfig.learning_rate, 
@@ -84,19 +89,23 @@ def build_actor_critic_network(input_feature, num_action, num_scene):
             decay_steps   = A3CConfig.decay_step,
             decay_rate    = A3CConfig.decay_rate)
         """
+        # create optizer
         optimizer = tf.train.AdamOptimizer(learning_rate = A3CConfig.learning_rate)
         #optimizer = tf.train.RMSPropOptimizer(learning_rate = A3CConfig.learning_rate, momentum = A3CConfig.momentum)
         
+        # optional: gradient clipping
         grad_var = optimizer.compute_gradients(loss)
         clipped_grad_var = [(tf.clip_by_value(grad, -10., 10.), var) for grad, var in grad_var]
         train_op = optimizer.apply_gradients(clipped_grad_var)
-        
         #train_op = optimizer.minimize(loss)
 
-        # sample_action
-        sample_action = []
+        # ops to sample_action using multinomial distribution given unnomalized log probability logits
+        action_sampler_ops = []
         for i in xrange(num_scene):
-            tf.multinomial(policy_logits_list[i], 1)
+            action_sampler_ops.append(tf.multinomial(
+                name = 'action_sampler_%02i' %(i), 
+                logits = policy_logits_list[i], 
+                num_samples = 1))
 
         # reward_history
         with tf.name_scope('reward_history'):
@@ -115,5 +124,5 @@ def build_actor_critic_network(input_feature, num_action, num_scene):
             tf.summary.scalar('loss', loss)
 
     return (global_step, action_placeholder, q_value_placeholder, scene_placeholder, reward_history_placeholder), \
-           (train_op, sample_action), (policy_logits_list, state_value_list, average_reward)
+           (train_op, action_sampler_ops), (policy_logits_list, state_value_list, average_reward)
 
