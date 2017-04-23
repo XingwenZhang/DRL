@@ -20,6 +20,9 @@ cd THOR
 # (by default it will sample 100 images for each environment)
 ./collect_target_images.sh
 
+# set THOR_HOME env_var
+# (or you can simply set it in your ~/.bashrc file for convenience)
+export THOR_HOME=$(pwd)
 ```
 
 
