@@ -17,7 +17,7 @@ cd THOR
 ./get_thor_binaries.sh
 
 # collect target images 
-# (by default it will sample 1000 images for each environment)
+# (by default it will sample 100 images for each environment)
 ./collect_target_images.sh
 
 ```
