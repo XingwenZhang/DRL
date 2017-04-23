@@ -2,7 +2,7 @@ import tensorflow as tf
 
 
 # max iterations for training (-1 means forever)
-max_iterations = 18000000
+max_iterations = 5000000
 
 # discounted factor
 discounted_factor = 0.99
@@ -45,11 +45,13 @@ replay_start_size = 50000
 target_network_update_freq = 10000
 
 # summary folder for tensor board
-summary_folder = './logs/'
+summary_folder = './logs_dueling_DQN/'
 
 # hyper-parameters recommended by DRL course
 lr = 0.0001
-initial_exploration = 0.05
-final_exploration = 0.05
-final_exploration_frame = 1000000
+
+# tricks
+reward_clipping = True
+life_drop_penalty = True
+
 exploration_change_rate = (final_exploration - initial_exploration)/final_exploration_frame
