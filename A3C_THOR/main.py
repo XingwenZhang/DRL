@@ -9,7 +9,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--mode', type=str, default='train', choices=['train', 'test'],
                         help='running mode (default to train)')
-    parser.add_argument('--use_gpu', type=bool, default=False,
+    parser.add_argument('--use_gpu', type=bool, default=True,
                         help='whether to use GPU (default to False)')
     parser.add_argument('--gpu_id', type=int, default=0,
                         help='the id of the GPU to be used (default to 0)')
