@@ -201,7 +201,7 @@ class A3CAgent:
         # perform testing
         while episode_idx <= A3CConfig.max_iterations:
             # sample and perform action, store history
-            action = self._select_action(state, episode_idx, test_mode = True)
+            action = self._select_action(env, state, episode_idx, test_mode = True)
             next_state, reward, done = self._perform_action(env, state, action, history_buffer)
             total_rewards += reward
             state = next_state
@@ -244,7 +244,7 @@ class A3CAgent:
         return Q
         """
 
-    def _select_action(self, thread_idx, state, i, test_mode = False):
+    def _select_action(self, env, state, i, test_mode = False):
         if test_mode:
             exploration_prob = A3CConfig.test_exploration
         else:
