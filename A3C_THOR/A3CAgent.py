@@ -170,6 +170,7 @@ class A3CAgent:
                 total_rewards = 0
                 # reset
                 state = self._request_new_episode(env)
+                print "Target idx:", env._target_idx
 
             # record summary
             self._summary_writer.add_summary(summary, global_step=self._iter_idx)

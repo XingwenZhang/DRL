@@ -52,19 +52,18 @@ def build_actor_critic_network(input_feature, num_action, num_scene):
     policy_logits_list = []
     policy_prob_list = []
     state_value_list = []
-    with tf.variable_scope('scene_specific_layers'):
-        for i in xrange(num_scene):
-            with tf.variable_scope('scene_%02i' %(i)):
-                with tf.variable_scope('policy_network'):
-                    policy_fc = TFUtil.fc_layer('policy_fc', embedded_feature, input_size=512, num_neron=512, variable_dict=variable_dict) 
-                    policy_logits = TFUtil.fc_layer('policy_logits', policy_fc, input_size=512, num_neron=num_action, activation=None, variable_dict=variable_dict)
-                    policy_probs = tf.nn.softmax(name = 'policy_probs', logits = policy_logits)
-                with tf.variable_scope('value_network'):
-                    value_fc = TFUtil.fc_layer('value_fc', embedded_feature, input_size=512, num_neron=512, variable_dict=variable_dict) 
-                    state_value = tf.squeeze(TFUtil.fc_layer('value', value_fc, input_size=512, num_neron=1, activation=None, variable_dict=variable_dict), axis = 1)                
-            policy_logits_list.append(policy_logits)
-            policy_prob_list.append(policy_probs)
-            state_value_list.append(state_value)
+    for i in xrange(num_scene):
+        with tf.variable_scope('scene_layer_%02i' %(i)):
+            with tf.variable_scope('policy_network'):
+                policy_fc = TFUtil.fc_layer('policy_fc', embedded_feature, input_size=512, num_neron=512, variable_dict=variable_dict) 
+                policy_logits = TFUtil.fc_layer('policy_logits', policy_fc, input_size=512, num_neron=num_action, activation=None, variable_dict=variable_dict)
+                policy_probs = tf.nn.softmax(name = 'policy_probs', logits = policy_logits)
+            with tf.variable_scope('value_network'):
+                value_fc = TFUtil.fc_layer('value_fc', embedded_feature, input_size=512, num_neron=512, variable_dict=variable_dict) 
+                state_value = tf.squeeze(TFUtil.fc_layer('value', value_fc, input_size=512, num_neron=1, activation=None, variable_dict=variable_dict), axis = 1)                
+        policy_logits_list.append(policy_logits)
+        policy_prob_list.append(policy_probs)
+        state_value_list.append(state_value)
 
     with tf.variable_scope('loss'):
         scene_loss = []
@@ -82,27 +81,27 @@ def build_actor_critic_network(input_feature, num_action, num_scene):
             scene_loss.append(policy_loss + value_loss - policy_entropy)
         loss = tf.reduce_sum(tf.transpose(scene_loss) * scene_placeholder) # scene_placeholder is a one hot vector
         
-    # train_op
-    # optional: varying learning_rate
-    """
-    learning_rate = tf.train.exponential_decay(
-        learning_rate = A3CConfig.learning_rate, 
-        global_step   = global_step, 
-        decay_steps   = A3CConfig.decay_step,
-        decay_rate    = A3CConfig.decay_rate)
-    """
-    # create optizer
-    optimizer = tf.train.AdamOptimizer(learning_rate = A3CConfig.learning_rate)
-    #optimizer = tf.train.RMSPropOptimizer(learning_rate = A3CConfig.learning_rate, momentum = A3CConfig.momentum)
-    
-    # optional: gradient clipping
-    grad_var = optimizer.compute_gradients(loss)
-    clipped_grad_var = []
-    for grad, var in grad_var:
-        if grad is not None:
-            clipped_grad_var.append((tf.clip_by_value(grad, -10., 10.), var))
-    train_op = optimizer.apply_gradients(clipped_grad_var)
-    #train_op = optimizer.minimize(loss)
+        # train_op
+        # optional: varying learning_rate
+        """
+        learning_rate = tf.train.exponential_decay(
+            learning_rate = A3CConfig.learning_rate, 
+            global_step   = global_step, 
+            decay_steps   = A3CConfig.decay_step,
+            decay_rate    = A3CConfig.decay_rate)
+        """
+        # create optizer
+        optimizer = tf.train.AdamOptimizer(learning_rate = A3CConfig.learning_rate)
+        #optimizer = tf.train.RMSPropOptimizer(learning_rate = A3CConfig.learning_rate, momentum = A3CConfig.momentum)
+        
+        # optional: gradient clipping
+        grad_var = optimizer.compute_gradients(loss)
+        clipped_grad_var = []
+        for grad, var in grad_var:
+            if grad is not None:
+                clipped_grad_var.append((tf.clip_by_value(grad, -10., 10.), var))
+        train_op = optimizer.apply_gradients(clipped_grad_var)
+        #train_op = optimizer.minimize(loss)
 
     # ops to sample_action using multinomial distribution given unnomalized log probability logits
     action_sampler_ops = []
