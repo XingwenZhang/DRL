@@ -16,9 +16,8 @@ linux_build=THOR_HOME + '/thor_binary/thor-cmu-201703101558-Linux64'
 x_display="0.0"
 
 # supported environments and actions (do not change the order of supported_actions)
-supported_envs = ['FloorPlan224']
-# supported_actions = ['MoveAhead', 'MoveBack'];
-supported_actions = ['MoveAhead', 'MoveBack', 'RotateLeft', 'RotateRight']; 
+supported_envs = ['FloorPlan224', 'FloorPlan225']
+supported_actions = ['MoveAhead', 'MoveBack', 'RotateLeft', 'RotateRight']
 # supported_actions = ['MoveAhead', 'MoveBack', 'MoveRight', 'MoveLeft', 'RotateLeft', 'RotateRight', 'LookUp', 'LookDown']
 
 # under what threshold we think two images are identical (used for collecting target images)
