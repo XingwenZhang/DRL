@@ -148,7 +148,6 @@ class EnvSim:
 			self._img_db = ImageDB()
 			self._pose_recorder = PoseRecorder()
 			self._pose_to_observation = {}
-			dump_path = os.path.join(config.env_db_folder, self._env_name + '.db')
 			# initial observation
 			event = self._env.reset(self._env_name)
 			self._pose_recorder.reset()
@@ -157,14 +156,16 @@ class EnvSim:
 			self._pose_to_observation[self._pose_recorder.get_pose()] = img_idx
 			# dfs scene traversal
 			self._dfs_traverse_scene()
-			# save 
+			# save
+			dump_path = os.path.join(config.env_db_folder, self._env_name + '.db') 
+			print('saving environment db to {0}'.format(dump_path))
 			self._img_db.optimize_memory_layout()
 			blob = (self._img_db, self._pose_to_observation)
 			pickle.dump(blob, open(dump_path, 'wb'))
 
 	def _dfs_traverse_scene(self):
 		for action_idx in range(len(config.supported_actions)):
-			# early cut if the resulting pose is visited
+			# early cut-off if the resulting pose is visited
 			self._pose_recorder.record(action_idx)
 			future_pose = self._pose_recorder.get_pose()
 			self._pose_recorder.record(get_reverse_action_idx(action_idx))
@@ -183,11 +184,11 @@ class EnvSim:
 					if self._img_db.get_size() % 100 == 0:
 						print '{0} images collected'.format(self._img_db.get_size())
 					self._dfs_traverse_scene()
-					# back-tracking
-					reverse_action_idx = get_reverse_action_idx(action_idx)
-					reverse_action_str = config.supported_actions[reverse_action_idx]
-					self._env.step(dict(action=reverse_action_str))
-					self._pose_recorder.record(reverse_action_idx)
+				# back-tracking
+				reverse_action_idx = get_reverse_action_idx(action_idx)
+				reverse_action_str = config.supported_actions[reverse_action_idx]
+				self._env.step(dict(action=reverse_action_str))
+				self._pose_recorder.record(reverse_action_idx)
 
 	def reset(self, env_name):
 		assert env_name in config.supported_envs, 'invalid env_name {0}'.format(env_name)
