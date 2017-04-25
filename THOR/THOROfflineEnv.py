@@ -9,6 +9,9 @@ import numpy as np
 import robosims.server
 import THORConfig as config
 
+import sys
+sys.setrecursionlimit(1000000000)
+
 def unpack_thor_event(event):
 	frame = event.frame
 	success = event.metadata['lastActionSuccess']
