@@ -17,15 +17,15 @@ x_display="0.0"
 
 # supported environments and actions (do not change the order of supported_actions)
 supported_envs = ['FloorPlan224']
-supported_actions = ['MoveAhead', 'MoveBack'];
-# supported_actions = ['MoveAhead', 'MoveBack', 'RotateLeft', 'RotateRight']; 
+# supported_actions = ['MoveAhead', 'MoveBack'];
+supported_actions = ['MoveAhead', 'MoveBack', 'RotateLeft', 'RotateRight']; 
 # supported_actions = ['MoveAhead', 'MoveBack', 'MoveRight', 'MoveLeft', 'RotateLeft', 'RotateRight', 'LookUp', 'LookDown']
 
 # under what threshold we think two images are identical (used for collecting target images)
 target_image_diff_threshold = 10
 
 # number of randomly sampled targets per scene
-targets_per_scene = 10
+targets_per_scene = 100
 
 # directory where target images are stored
 target_images_folder = THOR_HOME + '/target_images'
