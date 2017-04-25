@@ -13,8 +13,7 @@ import sys
 sys.setrecursionlimit(1000000000)	# yeah, DFS, you know....
 
 def unpack_thor_event(event):
-	frame = skimage.transform.resize(skimage.img_as_float(event.frame), 
-									 (config.net_input_height, config.net_input_width))
+	frame = skimage.transform.resize(event.frame, (config.net_input_height, config.net_input_width))
 	success = event.metadata['lastActionSuccess']
 	return frame, success
 
@@ -34,7 +33,7 @@ class ImageDB:
 		return len(self._storage) - 1
 
 	def get_img(self, idx):
-		return self._storage[idx]
+		return skimage.img_as_float(self._storage[idx])
 
 	def optimize_memory_layout(self):
 		self._storage = np.array(self._storage)
