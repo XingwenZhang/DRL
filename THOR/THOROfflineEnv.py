@@ -94,14 +94,12 @@ class PoseRecorder:
 			if (self._forward == PoseRecorder.left_transitions[i]).all():
 				self._forward = PoseRecorder.left_transitions[(i+1)%4]
 				return
-		assert False
 
 	def _turn_right(self):
 		for i in range(4):
 			if (self._forward == PoseRecorder.right_transitions[i]).all():
 				self._forward = PoseRecorder.right_transitions[(i+1)%4]
 				return
-		assert False
 
 	def _move_left(self):
 		self._turn_left();
@@ -115,11 +113,9 @@ class PoseRecorder:
 
 	def _look_up(self):
 		self._yaw += 1
-		assert(self._yaw <= 1)
 
 	def _look_down(self):
 		self._yaw -= 1
-		assert(self._yaw >= -1)
 
 
 class EnvSim:
