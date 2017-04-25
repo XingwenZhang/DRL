@@ -195,7 +195,7 @@ class EnvSim:
 			print('loading db of scene {0}...'.format(env_name))
 			load_path = os.path.join(config.env_db_folder, env_name + '.npz')
 			blob = np.load(load_path)
-			EnvSim._images_dbs[env_name] = blob['images_db']
+			EnvSim._images_dbs[env_name] = blob['img_db']
 			EnvSim._pose_to_observations[env_name] = blob['pose_to_observation']
 		self._env_name = env_name
 		self._img_db = EnvSim._images_dbs[env_name]
