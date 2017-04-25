@@ -4,7 +4,7 @@ Deep Reinforcement Learning
 
 ## THOR
 
-+ Prepare
++ **Prepare**
 
 	```
 	cd THOR
@@ -22,5 +22,26 @@ Deep Reinforcement Learning
 	# collect target images 
 	python script_generate_targets.py
 	```
+	
++ **HumanControledAgent**
 
-
+	This is an agent which you can control to interact with the environment. To launch HumanControledAgent, type the following command:
+	
+	```
+	python THORHumanAgent.py
+	```
+	![](pics/HumanAgent.png)
+	
+	+ commands:
+		
+		| cmd| action name|
+		|---|-------------|
+		|`w`| MoveForward |
+		|`s`| MoveBackward|
+		|`a`| MoveLeft    |
+		|`d`| MoveRight   |
+		|`j`| RotateRight |
+		|`l`| RotateLeft  |
+		|`i`| LookUp      |
+		|`k`| LookDown    |
+	
