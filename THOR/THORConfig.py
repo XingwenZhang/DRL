@@ -1,5 +1,8 @@
 # thor environment setting
 
+import os
+assert 'THOR_HOME' in os.environ, 'please first set env_var THOR_HOME as the absolute path of DRL/THOR'
+
 # size of the display
 screen_width=300
 screen_height=300
@@ -8,9 +11,6 @@ screen_height=300
 net_input_width=224
 net_input_height=224
 
-
-import os
-assert 'THOR_HOME' in os.environ, 'please first set env_var THOR_HOME as the absolute path of DRL/THOR'
 THOR_HOME=os.environ['THOR_HOME']
 darwin_build=THOR_HOME + '/thor_binary/thor-cmu-201703101557-OSXIntel64.app/Contents/MacOS/thor-cmu-201703101557-OSXIntel64'
 linux_build=THOR_HOME + '/thor_binary/thor-cmu-201703101558-Linux64'
@@ -29,6 +29,7 @@ targets_per_scene = 100
 
 # directory where target images are stored
 target_images_folder = THOR_HOME + '/target_images'
+env_db_folder = THOR_HOME + '/env_db'
 
 # random actions being taken when new episode is started
 random_start = 30  # TODO: check the value used in paper
