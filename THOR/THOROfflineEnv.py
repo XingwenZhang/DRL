@@ -1,21 +1,26 @@
-""" THORViewGraphBuilder
-This module implements routines to build a 
-veiw graph from THOR environment by doing a DFS search
+""" This module simulates THOR environment
+by creating & loading a frame databse of THOR
 """
 import os
-import shutil
 import cPickle as pickle
 import numpy as np
+import skimage
+import skimage.transform
 import robosims.server
 import THORConfig as config
 
 import sys
-sys.setrecursionlimit(1000000000)
+sys.setrecursionlimit(1000000000)	# yeah, DFS, you know....
 
 def unpack_thor_event(event):
-	frame = event.frame
+	frame = skimage.transform.resize(skimage.img_as_float(event.frame), 
+									 (config.net_input_height, config.net_input_width))
 	success = event.metadata['lastActionSuccess']
 	return frame, success
+
+def get_reverse_action_idx(action_idx):
+	reverse_action_idx = action_idx + 1 if action_idx % 2 == 0 else action_idx - 1
+	return reverse_action_idx
 
 class ImageDB:
 	def __init__(self):
@@ -26,6 +31,10 @@ class ImageDB:
 
 	def register_img(self, img):
 		self._storage.append(img)
+		return len(self._storage) - 1
+
+	def get_img(self, idx):
+		return self._storage[idx]
 
 	def optimize_memory_layout(self):
 		self._storage = np.array(self._storage)
@@ -114,38 +123,54 @@ class PoseRecorder:
 		assert(self._yaw >= -1)
 
 
-class EnvDB:
-	def __init__(self, env_name):
-		self._env_name = env_name
-		self._env = robosims.server.Controller(player_screen_width=config.screen_width,
-											   player_screen_height=config.screen_height,
-	                                 		   darwin_build=config.darwin_build,
-	                                 		   linux_build=config.linux_build,
-	                                 		   x_display=config.x_display)
-		self._img_db = ImageDB()
-		self._pose_recorder = PoseRecorder()
-		self._pose_to_observation = {}
+class EnvSim:
+
+	_images_dbs = {}
+	_pose_to_observations = {}
+
+	def __init__(self):
+		self._env_name = None
+		self._img_db = None
+		self._pose_recorder = None
+		self._pose_to_observation = None
+		self._env = None
 
 	def build(self):
-		dump_path = os.path.join(config.env_db_folder, self._env_name + '.views')
-
-		# initialize
+		self._env = robosims.server.Controller(player_screen_width=300,
+											   player_screen_height=300,
+			                                   darwin_build=config.darwin_build,
+			                                   linux_build=config.linux_build,
+			                                   x_display=config.x_display)
 		self._env.start()
-		event = self._env.reset(self._env_name)
-		self._pose_recorder.reset()
-		img, _ = unpack_thor_event(event)
-		img_idx = self._img_db.register_img(img)
-
-		# dfs
-		self._dfs_traverse_scene()
-
-		# save 
-		self._img_db.optimize_memory_layout()
-		blob = (self._img_db, self._pose_to_observation)
-		pickle.dump(blob, open(dump_path, 'wb'))
+		for self._env_name in config.supported_envs:
+			# reset 
+			print('building db of environment {0}...'.format(self._env_name))
+			self._img_db = ImageDB()
+			self._pose_recorder = PoseRecorder()
+			self._pose_to_observation = {}
+			dump_path = os.path.join(config.env_db_folder, self._env_name + '.db')
+			# initial observation
+			event = self._env.reset(self._env_name)
+			self._pose_recorder.reset()
+			img, _ = unpack_thor_event(event)
+			img_idx = self._img_db.register_img(img)
+			self._pose_to_observation[self._pose_recorder.get_pose()] = img_idx
+			# dfs scene traversal
+			self._dfs_traverse_scene()
+			# save 
+			self._img_db.optimize_memory_layout()
+			blob = (self._img_db, self._pose_to_observation)
+			pickle.dump(blob, open(dump_path, 'wb'))
 
 	def _dfs_traverse_scene(self):
 		for action_idx in range(len(config.supported_actions)):
+			# early cut if the resulting pose is visited
+			self._pose_recorder.record(action_idx)
+			future_pose = self._pose_recorder.get_pose()
+			self._pose_recorder.record(get_reverse_action_idx(action_idx))
+			if future_pose in self._pose_to_observation:
+				continue
+
 			action_str = config.supported_actions[action_idx]
 			event = self._env.step(dict(action=action_str))
 			img, success = unpack_thor_event(event)
@@ -154,18 +179,57 @@ class EnvDB:
 				pose = self._pose_recorder.get_pose()
 				if pose not in self._pose_to_observation:
 					img_idx = self._img_db.register_img(img)
+					self._pose_to_observation[pose] = img_idx
 					if self._img_db.get_size() % 100 == 0:
 						print '{0} images collected'.format(self._img_db.get_size())
-					self._pose_to_observation[pose] = img_idx
 					self._dfs_traverse_scene()
+					# back-tracking
+					reverse_action_idx = get_reverse_action_idx(action_idx)
+					reverse_action_str = config.supported_actions[reverse_action_idx]
+					self._env.step(dict(action=reverse_action_str))
+					self._pose_recorder.record(reverse_action_idx)
 
+	def reset(self, env_name):
+		assert env_name in config.supported_envs, 'invalid env_name {0}'.format(env_name)
+		if env_name not in EnvSim._images_dbs:
+			print('loading db of scene {0}...'.format(env_name))
+			load_path = os.path.join(config.env_db_folder, env_name + '.db')
+			print(load_path)
+			blob = pickle.load(open(load_path))
+			EnvSim._images_dbs[env_name] = blob[0]
+			EnvSim._pose_to_observations[env_name] = blob[1]
+		self._env_name = env_name
+		self._img_db = EnvSim._images_dbs[env_name]
+		self._pose_to_observation = EnvSim._pose_to_observations[env_name]
+		self._pose_recorder = PoseRecorder()
+		img_idx = self._pose_to_observation[self._pose_recorder.get_pose()]
+		return self._img_db.get_img(img_idx)
 
-if __name__ == '__main__':
-	if os.path.exists(config.env_db_folder):
-		shutil.rmtree(config.env_db_folder)
-	os.mkdir(config.env_db_folder)
-	for env_name in config.supported_envs:
-		print('bulding view graph for ' + env_name + '...')
-		db = EnvDB(env_name)
-		db.build()
-	print('done.')
+	def pre_load(self):
+		for env_name in config.supported_envs:
+			self.reset(env_name)
+		self._env_name = None
+		self._img_db = None
+		self._pose_recorder = None
+		self._pose_to_observation = None
+
+	def step(self, action_idx):
+		assert 0 <= action_idx < len(config.supported_actions), 'invalid action_idx {0}'.format(action_idx)
+		success = False
+		self._pose_recorder.record(action_idx)
+		# do a dry run and see if it succeeds
+		future_pose = self._pose_recorder.get_pose()
+		success = future_pose in self._pose_to_observation
+		if not success:
+			# reverse
+			reverse_action_idx = get_reverse_action_idx(action_idx)
+			self._pose_recorder.record(reverse_action_idx)
+		img_idx = self._pose_to_observation[self._pose_recorder.get_pose()]
+		return self._img_db.get_img(img_idx), success
+
+	def get_pose(self):
+		return self._pose_recorder.get_pose()
+
+	def get_num_images(self):
+		return len(self._img_db)
+

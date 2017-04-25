@@ -3,31 +3,30 @@ import numpy as np
 import random
 import robosims.server
 import THORConfig as config
+import cv2
 from THORTarget import THORTargetManager
+from THOROfflineEnv import EnvSim
 
 class THOREnvironment:
     def __init__(self):
-        self._env = robosims.server.Controller(player_screen_width=config.screen_width,
-                                               player_screen_height=config.screen_height,
-                                               darwin_build=config.darwin_build,
-                                               linux_build=config.linux_build,
-                                               x_display=config.x_display)
+        self._env = EnvSim()
         self._done = True
         self._total_episode_reward = 0
         self._env_idx = None
-        self._env_name= None
         self._target_idx = None
         self._target_img = None
+        self._target_img_pose = None
         self._target_img_mgr = THORTargetManager(config.target_images_folder)
         self._step_count = 0
-        self._env.start()
+        self._cur_frame = None
+
+        # uncomment it if you what lazy initialization
+        self._env.pre_load()
 
     def step(self, action_idx):
         assert(not self._done)
-        event = self._env.step(dict(action=config.supported_actions[action_idx]))
-        action_success = event.metadata['lastActionSuccess']
+        observation, action_success = self._env.step(action_idx)
         self._step_count += 1
-        observation = skimage.img_as_float(event.frame)
         if self._check_found_target(observation):
             self._done = True
             reward = 1
@@ -36,32 +35,31 @@ class THOREnvironment:
         if self._step_count == config.episode_max_steps:
             self._done = True
         self._total_episode_reward += reward
+        self.render(observation)
         return observation, action_success, reward, self._done
 
-    def reset(self, env_idx=None, target_idx=None):
+    def reset(self, env_idx, target_idx):
         assert(self._done)
-        if env_idx == None:
-            env_idx = self._env_idx
-            env_name = self._env_name
-        else:
-            assert(0 <= env_idx < len(config.supported_envs))
-            env_name = config.supported_envs[env_idx]
-        if target_idx == None:
-            target_idx = self._target_idx
-        assert(env_name is not None)
+        assert(0 <= env_idx < len(config.supported_envs))
         assert(target_idx is not None)
+        assert(0 <= target_idx < self.get_num_targets())
         self._env_idx = env_idx
-        self._env_name = env_name
         self._target_idx = target_idx
-        self._target_img = self._target_img_mgr.get_target_image(self._env_name, self._target_idx)
-        event = self._env.reset(env_name)
+        env_name = config.supported_envs[self._env_idx]
+        self._target_img = self._target_img_mgr.get_target_image(env_name, self._target_idx)
+        self._target_img_pose = self._target_img_mgr.get_target_image_pose(env_name, self._target_idx)
+        observation = self._env.reset(env_name)
         for _ in range(random.randrange(0, config.random_start + 1)):
-            event = self._env.step(action=random.randrange(0, self.get_num_actions()))
-        observation = skimage.img_as_float(event.frame)
+            observation = self._env.step(random.randrange(0, self.get_num_actions()))
         self._total_episode_reward = 0
         self._step_count = 0
         self._done = False
+        self.render(observation)
         return observation
+
+    def render(self, frame):
+        if config.display:
+            cv2.imshow('THOR', frame)
 
     def reset_random(self):
         target_idx = random.randrange(0, self.get_num_targets())
@@ -75,8 +73,7 @@ class THOREnvironment:
         return config.targets_per_scene
 
     def get_env_name(self):
-        assert(self._env_name is not None)
-        return self._env_name
+        return config.supported_envs[self._env_idx]
 
     def get_env_idx(self):
         assert(self._env_idx is not None)
@@ -93,11 +90,9 @@ class THOREnvironment:
         return self._total_episode_reward
 
     def _check_found_target(self, observation):
-        assert(self._target_img is not None)
-        diff = np.sum(np.abs(self._target_img - observation))
-        if diff < config.target_image_diff_threshold:
-            return True 
-        else:
-            return False
+        assert(self._target_img_pose is not None)        
+        return self._target_img_pose == self._env.get_pose()
+
+
     
 

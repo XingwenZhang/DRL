@@ -7,8 +7,9 @@ import skimage
 import skimage.io
 import skimage.exposure
 import numpy as np
-import robosims.server
 import random
+import cPickle as pickle
+from THOROfflineEnv import EnvSim
 
 class THORTargetManager:
 	def __init__(self, target_images_folder):
@@ -19,6 +20,11 @@ class THORTargetManager:
 		file_path = os.path.join(self.target_images_folder, env_name, str(target_idx) + '.png')
 		return skimage.img_as_float(skimage.io.imread(file_path))
 
+	def get_target_image_pose(self, env_name, target_idx):
+		folder = os.path.join(self.target_images_folder, env_name)
+		file_path = os.path.join(self.target_images_folder, env_name, str(target_idx) + '.pose')
+		return pickle.load(open(file_path, 'rb'))
+
 	def collect_target_images(self, env_name):
 		"""
 		Find all target images of the scene and save them to dump_folder
@@ -27,52 +33,33 @@ class THORTargetManager:
 		if not os.path.exists(dump_folder):
 			os.mkdir(dump_folder)
 		num_images = config.targets_per_scene
-		env = robosims.server.Controller(player_screen_width=config.screen_width,
-                                         player_screen_height=config.screen_height,
-                                         darwin_build=config.darwin_build,
-                                         linux_build=config.linux_build,
-                                         x_display=config.x_display)
-		env.start()
-		event = env.reset(env_name)
-		target_images = np.empty((num_images, config.screen_height, config.screen_width, 3))
+		env = EnvSim()
+		env.reset(env_name)
+		target_images = np.empty((num_images, config.net_input_height, config.net_input_width, 3))
+		target_images_poses = []
 		i = 0
-		while True:
-			action = random.choice(config.supported_actions)
-			max_steps = 10 if action.startswith('Move') else 2
+		while i < num_images:
+			action_idx = random.randrange(0, len(config.supported_actions))
+			action_str = config.supported_actions[action_idx]
+			max_steps = 10 if action_str.startswith('Move') else 2
 			for _ in range(random.randrange(1, max_steps)):
-				event = env.step(dict(action=action))
-				success = event.metadata['lastActionSuccess']
-				target_image = skimage.img_as_float(event.frame)
+				frame, success = env.step(action_idx)
 				if not success:
 					break
 			# check low contrast
-			if skimage.exposure.is_low_contrast(target_image):
+			if skimage.exposure.is_low_contrast(frame):
 				continue
-			# check duplication
+			# check duplication in terms of appearance
 			if i !=0:
-				if (np.sum(np.abs(target_images[0:i] - target_image), axis=(1,2,3)) < config.target_image_diff_threshold).any():
+				if (np.sum(np.abs(target_images[0:i] - frame), axis=(1,2,3)) < config.target_image_diff_threshold).any():
 					continue
-			target_images[i] = target_image
+			target_images[i] = frame
+			target_images_poses.append(env.get_pose())
 			i+=1
 			if i % 10==0:
 				print(str(i) + ' target images collected.')
-			if i == num_images:
-				break
-		del env
-		# dump images
+		# dump target images and poses
+		assert(len(target_images_poses) == num_images)
 		for i in range(num_images):
 			skimage.io.imsave(os.path.join(dump_folder, str(i) + '.png'), target_images[i])
-
-
-if __name__ == '__main__':
-	if os.path.exists(config.target_images_folder):
-		shutil.rmtree(config.target_images_folder)
-	os.mkdir(config.target_images_folder)
-	mgr = THORTargetManager(config.target_images_folder)
-	for env_name in config.supported_envs:
-		print('collecing target images for ' + env_name + '...')
-		mgr.collect_target_images(env_name)
-	print('done.')
-
-
-
+			pickle.dump(target_images_poses[i], open(os.path.join(dump_folder, str(i) + '.pose'), 'wb'))
