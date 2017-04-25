@@ -35,7 +35,8 @@ class THOREnvironment:
         if self._step_count == config.episode_max_steps:
             self._done = True
         self._total_episode_reward += reward
-        self.render(observation)
+        if config.display:
+            self.render(observation, 'cur_frame')
         return observation, action_success, reward, self._done
 
     def reset(self, env_idx, target_idx):
@@ -50,16 +51,18 @@ class THOREnvironment:
         self._target_img_pose = self._target_img_mgr.get_target_image_pose(env_name, self._target_idx)
         observation = self._env.reset(env_name)
         for _ in range(random.randrange(0, config.random_start + 1)):
-            observation = self._env.step(random.randrange(0, self.get_num_actions()))
+            observation, _ = self._env.step(random.randrange(0, self.get_num_actions()))
         self._total_episode_reward = 0
         self._step_count = 0
         self._done = False
-        self.render(observation)
+        if config.display:
+            self.render(self._target_img, 'target')
+            self.render(observation, 'cur_frame')
         return observation
 
-    def render(self, frame):
-        if config.display:
-            cv2.imshow('THOR', frame)
+    def render(self, frame, name):
+        env_name = config.supported_envs[self._env_idx]
+        cv2.imshow(name, frame)
 
     def reset_random(self):
         target_idx = random.randrange(0, self.get_num_targets())

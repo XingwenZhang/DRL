@@ -2,12 +2,12 @@
 by creating & loading a frame databse of THOR
 """
 import os
-import cPickle as pickle
 import numpy as np
 import skimage
 import skimage.transform
 import robosims.server
 import THORConfig as config
+import THORUtils as utils
 
 import sys
 sys.setrecursionlimit(1000000000)	# yeah, DFS, you know....
@@ -151,12 +151,13 @@ class EnvSim:
 			self._pose_to_observation[self._pose_recorder.get_pose()] = img_idx
 			# dfs scene traversal
 			self._dfs_traverse_scene()
+			print 'total: {0} images collected'.format(self._img_db.get_size())
 			# save
-			dump_path = os.path.join(config.env_db_folder, self._env_name + '.npz') 
+			dump_path = os.path.join(config.env_db_folder, self._env_name + '.env') 
 			print('saving environment db to {0}'.format(dump_path))
 			self._img_db.optimize_memory_layout()
 			blob = (self._img_db, self._pose_to_observation)
-			np.savez_compressed(dump_path, img_db=self._img_db, pose_to_observation=self._pose_to_observation)
+			utils.dump(blob, open(dump_path,'wb'))
 
 	def _dfs_traverse_scene(self):
 		for action_idx in range(len(config.supported_actions)):
@@ -189,10 +190,10 @@ class EnvSim:
 		assert env_name in config.supported_envs, 'invalid env_name {0}'.format(env_name)
 		if env_name not in EnvSim._images_dbs:
 			print('loading db of scene {0}...'.format(env_name))
-			load_path = os.path.join(config.env_db_folder, env_name + '.npz')
-			blob = np.load(load_path)
-			EnvSim._images_dbs[env_name] = blob['img_db']
-			EnvSim._pose_to_observations[env_name] = blob['pose_to_observation']
+			load_path = os.path.join(config.env_db_folder, env_name + '.env')
+			blob = utils.load(open(load_path,'rb'))
+			EnvSim._images_dbs[env_name] = blob[0]
+			EnvSim._pose_to_observations[env_name] = blob[1]
 		self._env_name = env_name
 		self._img_db = EnvSim._images_dbs[env_name]
 		self._pose_to_observation = EnvSim._pose_to_observations[env_name]

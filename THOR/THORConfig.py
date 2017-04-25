@@ -4,7 +4,7 @@ import os
 assert 'THOR_HOME' in os.environ, 'please first set env_var THOR_HOME as the absolute path of DRL/THOR'
 
 # open display
-display = False
+display = True
 
 # size of the input image to the network
 net_input_width=224
@@ -15,10 +15,18 @@ darwin_build=THOR_HOME + '/thor_binary/thor-cmu-201703101557-OSXIntel64.app/Cont
 linux_build=THOR_HOME + '/thor_binary/thor-cmu-201703101558-Linux64'
 x_display="0.0"
 
-# supported environments and actions (do not change the order of supported_actions)
+# supported_envs = ['FloorPlan224']
 supported_envs = ['FloorPlan224', 'FloorPlan225']
+
+# supported_actions = ['MoveAhead', 'MoveBack']
+# supported_actions = ['MoveAhead', 'MoveBack', 'MoveLeft', 'MoveRight']
 supported_actions = ['MoveAhead', 'MoveBack', 'RotateLeft', 'RotateRight']
-# supported_actions = ['MoveAhead', 'MoveBack', 'MoveRight', 'MoveLeft', 'RotateLeft', 'RotateRight', 'LookUp', 'LookDown']
+# supported_actions = ['MoveAhead', 'MoveBack', 'MoveLeft', 'MoveRight', 'RotateLeft', 'RotateRight', 'LookUp', 'LookDown']
+
+# build action to idx mapping
+supported_actions_idx = {}
+for i in range(len(supported_actions)):
+	supported_actions_idx[supported_actions[i]] = i
 
 # under what threshold we think two images are identical (used for collecting target images)
 target_image_diff_threshold = 10
@@ -35,8 +43,3 @@ random_start = 30  # TODO: check the value used in paper
 
 # maximum number of steps before the episode terminates
 episode_max_steps = 10000
-
-# for debugging
-episode_max_steps = 10000000
-
-
