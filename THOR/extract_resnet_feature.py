@@ -17,6 +17,11 @@ def extract_image_feature(imgs, net, img_transformer):
     return features
 
 if __name__ == '__main__':
+    if len(sys.argv) != 3:
+        print "Usage: {0} input_images_npy output_npy".format(sys.argv[0])
+        print "input_images_npy -- path to the input image npy file"
+        print "output_npy -- path to the output feature npy file"
+        exit(1)
     
     # load caffe models
     resnet_root = '../../deep-residual-networks'
@@ -49,5 +54,6 @@ if __name__ == '__main__':
     transformer.set_channel_swap('data', (2,1,0))  # swap channels from RGB to BGR
 
     # load image here
-    imgs = numpy.zeors((0, 300, 300, 3))
+    imgs = numpy.load(sys.argv[1])
     features = extract_image_feature(imgs, net, transformer)
+    numpy.save(sys.argv[2], features)
