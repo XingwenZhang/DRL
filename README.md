@@ -73,4 +73,4 @@ Deep Reinforcement Learning
 	python extract_resnet_feature.py input_image_npy output_feature_npy
 	```
 
-	The extracted feature will be saved **to** `THOR/output_feature_npy`
+	The extracted feature will be saved **to** `output_feature_npy`
