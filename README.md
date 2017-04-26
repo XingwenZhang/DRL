@@ -35,7 +35,7 @@ Deep Reinforcement Learning
 	
 		```
 		
-		**Or** you can download target images from [here](https://cmu.box.com/s/fy49k0zo6hhumxld0fp3r6h7biow5rld) and compress it **to** `THOR/target_images` folder.
+		**Or** you can download target images from [here](https://cmu.box.com/s/fy49k0zo6hhumxld0fp3r6h7biow5rld) and decompress it **to** `THOR/target_images` folder.
 	
 + **HumanControledAgent**
 
@@ -59,3 +59,18 @@ Deep Reinforcement Learning
 		|`i`| LookUp      |
 		|`k`| LookDown    |
 	
++ **Extract RESNET Feature**
+
+	This is to extract Resnet feature for offline environment. 
+
+	First, clone the Resnet project from [here](https://github.com/KaimingHe/deep-residual-networks) at the same level of this project.
+
+	Second, download the Resnet pretrain model and decompress it **to** `RESNET_PATH/pretrain_models` folder.
+
+	To extract the feature, type:
+	
+	```
+	python extract_resnet_feature.py input_image_npy output_feature_npy
+	```
+
+	The extracted feature will be saved **to** `THOR/output_feature_npy`
