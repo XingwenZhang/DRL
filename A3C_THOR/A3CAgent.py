@@ -31,6 +31,10 @@ class A3CAgent:
         self._supported_scens = THORConfig.supported_envs
         self._num_scenes = len(self._supported_scens)
         self._feature_mode = feature_mode
+
+        # preload the databse
+        THOREnvironment.pre_load(feat_mode = feature_mode)        
+       
         self._envs = [THOREnvironment(feat_mode = feature_mode) for _ in xrange(self._num_threads)]
 
         self._num_actions = len(THORConfig.supported_actions)
