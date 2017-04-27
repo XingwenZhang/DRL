@@ -8,8 +8,8 @@ from THORTarget import THORTargetManager
 from THOROfflineEnv import EnvSim
 
 class THOREnvironment:
-    def __init__(self):
-        self._env = EnvSim()
+    def __init__(self, feat_mode = False):
+        self._env = EnvSim(feat_mode = feat_mode)
         self._done = True
         self._total_episode_reward = 0
         self._env_idx = None

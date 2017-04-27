@@ -8,6 +8,7 @@ from THOR import THORConfig
 import TFUtil
 import THORNet
 from THOR.THOREnv import THOREnvironment
+import THOR.THOROfflineEnv as THOROfflineEnv
 
 import A3CUtil
 import A3CConfig
@@ -19,7 +20,7 @@ from collections import deque
 class A3CAgent:
     """ A3C Agent
     """
-    def __init__(self, num_threads, model_save_frequency, model_save_path, use_extracted_feature = False):
+    def __init__(self, num_threads, model_save_frequency, model_save_path, offline_mode = False, feature_mode = False):
         # model related setting
         self._model_save_freq = model_save_frequency
         self._model_save_path = model_save_path
@@ -28,11 +29,9 @@ class A3CAgent:
         self._num_threads = num_threads
         self._supported_scens = THORConfig.supported_envs
         self._num_scenes = len(self._supported_scens)
-        self._use_extracted_feature = use_extracted_feature
-        if self._use_extracted_feature:
-            self._resnet_feature_table = np.load(THORConfig.feature_table_path)
+        self._feature_mode = feature_mode
+        self._envs = [THOREnvironment(feat_mode = feature_mode) for _ in xrange(self._num_threads)]
 
-        self._envs = [THOREnvironment() for _ in xrange(self._num_threads)]
         self._num_actions = len(THORConfig.supported_actions)
         self._episode_reward_buffer = deque(maxlen=100)
         self._episode_reward_buffer.append(0)
@@ -76,7 +75,7 @@ class A3CAgent:
         with tf.Graph().as_default():
             with tf.device(device_str):
                 # create resnet if no extracted feature
-                if not self._use_extracted_feature:
+                if not self._feature_mode:
                     resnet_saver = tf.train.import_meta_graph(A3CConfig.resnet_meta_graph)
                     graph = tf.get_default_graph()
                     self._tf_resnet_input = graph.get_tensor_by_name("images:0") 
@@ -97,12 +96,12 @@ class A3CAgent:
                 if check_point is None:
                     # initialize all variable
                     self._tf_sess.run(init)
-                    if not self._use_extracted_feature:
+                    if not self._feature_mode:
                         # load pretrain resnet
                         resnet_saver.restore(self._tf_sess, A3CConfig.resnet_pretrain_model)
                     self._iter_idx = 0
                 else:
-                    if not self._use_extracted_feature:
+                    if not self._feature_mode:
                         # load pretrain resnet
                         resnet_saver.restore(self._tf_sess, A3CConfig.resnet_pretrain_model)
                     self.load(self._model_save_path, check_point)
@@ -302,7 +301,7 @@ class A3CAgent:
         return action
 
     def _perform_action(self, env, state, action, history_buffer):
-        if not self._use_extracted_feature:
+        if not self._feature_mode:
             # perfrom action and get next frame
             next_frame, _, reward, done = env.step(action)
             next_frame = self.preprocess_frame(next_frame)
@@ -314,9 +313,9 @@ class A3CAgent:
                 axis = 0)
         else:
             # perfrom action, get next frame idx, and retrieve the feature from table
-            next_idx, _, reward, done = env.step(action)
+            next_state, _, reward, done = env.step(action)
             next_state = np.concatenate(
-                (state[1:A3CConfig.num_history_frames, :], self._resnet_feature_table[next_idx:next_idx+1, :], state[-1:, :]),
+                (state[1:A3CConfig.num_history_frames, :], next_state[np.newaxis, :], state[-1:, :]),
                 axis = 0)
         # get the value of the current state
         #value = self._tf_sess.run( value_op, feed_dict = {state_op: state})[0]
@@ -332,7 +331,7 @@ class A3CAgent:
         return next_state, reward, done
 
     def _request_new_episode(self, env):
-        if not self._use_extracted_feature:
+        if not self._feature_mode:
             frame = self.preprocess_frame(env.reset_random())
             # extract resnet feature
             state = self._tf_sess.run(self._tf_resnet_output, 
@@ -342,9 +341,7 @@ class A3CAgent:
                                     {self._tf_resnet_input: self.preprocess_frame(env._target_img)[np.newaxis, :, :, :]})
             state = np.concatenate((state, target), axis = 0)
         else:
-            idx = env.reset_random()
-            # retrieve resnet feature from table
-            feature = self._resnet_feature_table[idx, :]
+            feature = env.reset_random()
             state = np.tile(feature[np.newaxis, :], (A3CConfig.num_history_frames, 1))
         return state
 
