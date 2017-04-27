@@ -238,14 +238,11 @@ class EnvSim:
 		else:
 			return self._img_db.get_img(idx)
 
-	def pre_load(self):
+	@staticmethod
+	def pre_load(feat_mode=True):
+		env = EnvSim(feat_mode = feat_mode)
 		for env_name in config.supported_envs:
-			self.reset(env_name)
-		self._env_name = None
-		self._img_db = None
-		self._feat_db = None
-		self._pose_recorder = None
-		self._pose_to_observation = None
+			env.reset(env_name)
 
 	def step(self, action_idx):
 		assert 0 <= action_idx < len(config.supported_actions), 'invalid action_idx {0}'.format(action_idx)
@@ -273,4 +270,13 @@ class EnvSim:
 		else:
 			return len(self._img_db)
 
+	@staticmethod
+	def get_feat_dbs():
+		assert len(EnvSim._feats_dbs) == len(config.supported_envs), 'feature database is not loaded completedly.'
+		return EnvSim._feats_dbs
+
+	@staticmethod
+	def get_pose_to_idx():
+		assert len(EnvSim._pose_to_observations) == len(config.supported_envs), 'database is not loaded completedly.'
+		return EnvSim._pose_to_observations		
 

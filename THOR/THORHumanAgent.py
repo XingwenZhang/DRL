@@ -11,7 +11,10 @@ import cv2
 commands = {'w':'MoveAhead', 's':'MoveBack', 'a':'MoveLeft', 'd':'MoveRight',
 			'j':'RotateLeft','l':'RotateRight', 'i':'LookUp', 'k':'LookDown'}
 
-thor_env = THOREnvironment()
+feat_mode = True
+
+thor_env = THOREnvironment(feat_mode = feat_mode)
+thor_env.pre_load(feat_mode)
 
 num_actions = thor_env.get_num_actions()
 num_targets = thor_env.get_num_targets()
@@ -25,8 +28,8 @@ print('cur_env_idx: ' + str(thor_env.get_env_idx()))
 print('cur_env_name: ' + thor_env.get_env_name())
 
 current_target = thor_env.get_target_image()
-skimage.io.imsave('target.png', current_target)
 while True:
+	assert(config.display)
 	command_chr = chr(cv2.waitKey())
 	if command_chr not in commands:
 		continue
@@ -35,10 +38,10 @@ while True:
 		print('{0} is not supported.'.format(action_name))
 	action_idx = config.supported_actions_idx[action_name]
 	observation, action_success, reward, done = thor_env.step(action_idx)
+	print(observation)
 	if reward > 0:
 		print('found !')
 		assert(done)
 	if done:
 		break
 print('total_episode_reward: ' + str(thor_env.get_total_episode_reward()))
-

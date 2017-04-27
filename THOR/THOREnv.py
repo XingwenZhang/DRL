@@ -16,12 +16,10 @@ class THOREnvironment:
         self._target_idx = None
         self._target_img = None
         self._target_img_pose = None
-        self._target_img_mgr = THORTargetManager(config.target_images_folder)
+        self._target_img_mgr = THORTargetManager(config.target_images_folder, enable_feat_load = feat_mode)
         self._step_count = 0
         self._cur_frame = None
-
-        # uncomment it if you what lazy initialization
-        self._env.pre_load()
+        self._feat_mode = feat_mode
 
     def step(self, action_idx):
         assert(not self._done)
@@ -36,7 +34,8 @@ class THOREnvironment:
             self._done = True
         self._total_episode_reward += reward
         if config.display:
-            self.render(observation, 'cur_frame')
+            if not self._feat_mode:
+                self.render(observation, 'cur_frame')
         return observation, action_success, reward, self._done
 
     def reset(self, env_idx, target_idx):
@@ -48,7 +47,7 @@ class THOREnvironment:
         self._target_idx = target_idx
         env_name = config.supported_envs[self._env_idx]
         self._target_img = self._target_img_mgr.get_target_image(env_name, self._target_idx)
-        self._target_img_pose = self._target_img_mgr.get_target_image_pose(env_name, self._target_idx)
+        self._target_img_pose = self._target_img_mgr.get_target_pose(env_name, self._target_idx)
         observation = self._env.reset(env_name)
         for _ in range(random.randrange(0, config.random_start + 1)):
             observation, _ = self._env.step(random.randrange(0, self.get_num_actions()))
@@ -57,7 +56,8 @@ class THOREnvironment:
         self._done = False
         if config.display:
             self.render(self._target_img, 'target')
-            self.render(observation, 'cur_frame')
+            if not self._feat_mode:
+                self.render(observation, 'cur_frame')
         return observation
 
     def render(self, frame, name):
@@ -86,16 +86,20 @@ class THOREnvironment:
         assert(self._target_img is not None)
         return self._target_img
 
+    def get_target_feat(self):
+        assert(self._feat_mode)
+        return self._target_img_mgr.get_target_feat(self._target_idx)
+
     def episode_done(self):
         return self._done
 
     def get_total_episode_reward(self):
         return self._total_episode_reward
 
+    @staticmethod
+    def pre_load(feat_mode):
+        EnvSim.pre_load(feat_mode)
+
     def _check_found_target(self, observation):
-        assert(self._target_img_pose is not None)        
+        assert(self._target_img_pose is not None)
         return self._target_img_pose == self._env.get_pose()
-
-
-    
-
