@@ -44,3 +44,8 @@ random_start = 30  # TODO: check the value used in paper
 
 # maximum number of steps before the episode terminates
 episode_max_steps = 10000
+
+# reward received
+reward_notfound = -0.01
+reward_found = 10.0
+

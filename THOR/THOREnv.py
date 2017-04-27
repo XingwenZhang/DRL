@@ -27,9 +27,9 @@ class THOREnvironment:
         self._step_count += 1
         if self._check_found_target(observation):
             self._done = True
-            reward = 1
+            reward = config.reward_notfound
         else:
-            reward = -1
+            reward = config.reward_found
         if self._step_count == config.episode_max_steps:
             self._done = True
         self._total_episode_reward += reward
