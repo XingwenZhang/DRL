@@ -9,17 +9,19 @@ import cPickle
 import THORUtils as utils
 import THORConfig as config
 
+feature_layer_name = 'pool5'
+
 def extract_image_feature(imgs, net, img_transformer):
     features = []
-    for i in xrange(len(features)):
-        print "extraing image #%05i" %(i)
+    for i in xrange(len(imgs)):
         net.blobs['data'].data[...] = img_transformer.preprocess('data', imgs[i, :, :, :])
-        net.forward(end = 'pool5')
-        features.append(net.blobs['pool5'].data.mean(0).mean(1).mean(1))
+        net.forward(end = feature_layer_name)
+        features.append(net.blobs[feature_layer_name].data.mean(0).mean(1).mean(1))
     features = numpy.array(features)
     return features
 
 if __name__ == '__main__':
+
     # load caffe models
     resnet_root = '../../deep-residual-networks'
     caffe.set_mode_gpu()
@@ -32,9 +34,9 @@ if __name__ == '__main__':
                     caffe.TEST)     # use test mode (e.g., don't perform dropout)
 
     # set batch size
-    net.blobs['data'].reshape(1,     # batch size
-                              3,         # 3-channel (BGR) images
-                              224, 224)  # image size is 224x224
+    net.blobs['data'].reshape(1, # batch size
+                              3,          # 3-channel (BGR) images
+                              224, 224)   # image size is 224x224
 
     # load the mean image (as distributed with Caffe) for subtraction
     blob = caffe.proto.caffe_pb2.BlobProto()
