@@ -217,6 +217,8 @@ class EnvSim:
 				EnvSim._feats_dbs[env_name] = blob[0]
 				EnvSim._pose_to_observations[env_name] = blob[1]
 				self._feat_db = EnvSim._feats_dbs[env_name]
+			else:
+    				self._feat_db = EnvSim._feats_dbs[env_name]
 		else:
 			if env_name not in EnvSim._images_dbs:
 				print('loading db of scene {0}...'.format(env_name))
@@ -225,6 +227,8 @@ class EnvSim:
 				EnvSim._images_dbs[env_name] = blob[0]
 				EnvSim._pose_to_observations[env_name] = blob[1]
 				self._img_db = EnvSim._images_dbs[env_name]
+			else:
+    				self._img_db = EnvSim._images_dbs[env_name]
 		self._env_name = env_name
 		self._pose_to_observation = EnvSim._pose_to_observations[env_name]
 		self._pose_recorder = PoseRecorder()
