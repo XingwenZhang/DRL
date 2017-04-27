@@ -321,7 +321,7 @@ class A3CAgent:
         # get the value of the current state
         #value = self._tf_sess.run( value_op, feed_dict = {state_op: state})[0]
         value = self._tf_sess.run(
-            self._tf_acn_value_list[env._env_idx],
+            self._tf_acn_state_value_list[env._env_idx],
             {self._tf_acn_state: state}
             )[0]
         
@@ -344,6 +344,8 @@ class A3CAgent:
         else:
             feature = env.reset_random()
             state = np.tile(feature[np.newaxis, :], (A3CConfig.num_history_frames, 1))
+            target = env._target_feature
+            state = np.concatenate((state, target), axis = 0)
         return state
 
     def _perform_random_action(self):
