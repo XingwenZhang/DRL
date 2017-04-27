@@ -1,5 +1,6 @@
 import sys
 sys.path.append('../')
+sys.path.append('../THOR')
 import random
 import tensorflow as tf
 import numpy as np
@@ -8,7 +9,7 @@ from THOR import THORConfig
 import TFUtil
 import THORNet
 from THOR.THOREnv import THOREnvironment
-import THOR.THOROfflineEnv as THOROfflineEnv
+from THOR import THOROfflineEnv
 
 import A3CUtil
 import A3CConfig
