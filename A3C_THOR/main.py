@@ -21,11 +21,14 @@ if __name__ == '__main__':
                         help='dump model at every k-th iteration (default to 5000)')
     parser.add_argument('--num_threads', type=int, default=4,
                         help='number of threads to use in A3C algorithm (default to 4)')
+    parser.add_argument('--use_extrated_feature', type=bool, default=True,
+                        help='whether or not to use extrated feature (default to True)')
     args = parser.parse_args()
 
     if args.mode == 'train':
         agent = A3CAgent(num_threads = args.num_threads,
-                         model_save_frequency=args.model_save_freq, model_save_path=args.model_save_path)
+                         model_save_frequency=args.model_save_freq, model_save_path=args.model_save_path,
+                         use_extracted_feature = args.use_extrated_feature)
         assert(args.model_save_path is not None)
         agent.learn(check_point = args.check_point, use_gpu=args.use_gpu, gpu_id=args.gpu_id)
     else:

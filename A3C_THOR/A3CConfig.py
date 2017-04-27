@@ -16,7 +16,7 @@ momentum = 0.8
 decay = 0.99
 
 # epsilon greedy exploration
-initial_exploration = 0.4
+initial_exploration = 0.5
 final_exploration = 0.0
 final_exploration_frame = 20000
 exploration_change_rate = (final_exploration - initial_exploration)/final_exploration_frame

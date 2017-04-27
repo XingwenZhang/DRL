@@ -10,7 +10,7 @@ class HistoryBuffer:
         self._discount_factor = gamma
 
         # initialize buffers
-        self._state_buffer  = np.zeros(shape = (0, THORConfig.net_input_width, THORConfig.net_input_height, 3))
+        self._state_buffer  = np.zeros(shape = (0, 2048))
         self._reward_buffer = []
         self._action_buffer = []
         self._value_buffer = []
@@ -22,7 +22,7 @@ class HistoryBuffer:
         self._value_buffer.append(value)
 
     def clean_up(self):
-        self._state_buffer  = np.zeros(shape = (0, THORConfig.net_input_width, THORConfig.net_input_height, 3))
+        self._state_buffer  = np.zeros(shape = (0, 2048))
         self._reward_buffer = []
         self._action_buffer = []
         self._value_buffer = []
