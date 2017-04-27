@@ -185,7 +185,7 @@ class A3CAgent:
 
             _, _, _, summary = \
             self._tf_sess.run([self._tf_acn_train_op, self._tf_average_reward, self._tf_average_step, self._tf_summary_op],
-                            feed_dict={ self._tf_global        : self._iter_idx,
+                            feed_dict={ self._tf_global_step   : self._iter_idx,
                                         self._tf_acn_state     : states,
                                         self._tf_acn_action    : actions,
                                         self._tf_acn_q_value   : q_values,
@@ -202,6 +202,7 @@ class A3CAgent:
                 self._episode_step_buffer.append(total_steps)
                 print("Number of steps for this episode: {}".format(total_steps))
                 print("Average number of steps for last 100 episodes: {}".format(np.mean(self._episode_step_buffer)))
+                total_steps = 0
                 # save episode reward
                 self._episode_reward_buffer.append(total_rewards)
                 print("Reward for this episode: {}".format(total_rewards))
@@ -302,7 +303,7 @@ class A3CAgent:
                 #action = self._tf_sess.run(sampler_op, {network_state_op: state})[0][0]
                 action = self._tf_sess.run(
                     self._tf_action_samplers[env._env_idx],
-                    {self._tf_acn_state: state})[0]
+                    {self._tf_acn_state: state})[0][0]
         return action
 
     def _perform_action(self, env, state, action, history_buffer):
@@ -348,8 +349,8 @@ class A3CAgent:
         else:
             feature = env.reset_random()
             state = np.tile(feature[np.newaxis, :], (A3CConfig.num_history_frames, 1))
-            target = env._target_feature
-            state = np.concatenate((state, target), axis = 0)
+            target = env.get_target_feat() 
+            state = np.concatenate((state, target[np.newaxis, :]), axis = 0)
         return state
 
     def _perform_random_action(self):

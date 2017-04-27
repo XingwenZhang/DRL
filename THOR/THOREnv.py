@@ -88,7 +88,7 @@ class THOREnvironment:
 
     def get_target_feat(self):
         assert(self._feat_mode)
-        return self._target_img_mgr.get_target_feat(self._target_idx)
+        return self._target_img_mgr.get_target_feat(config.supported_envs[self._env_idx], self._target_idx)
 
     def episode_done(self):
         return self._done

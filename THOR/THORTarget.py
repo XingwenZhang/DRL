@@ -34,7 +34,7 @@ class THORTargetManager:
 		assert self.pose_to_view_idx is not None, 'Did you forget to construct THORTargetManager with enable_feat_load set to True?'
 		assert(env_name in self.feat_dbs)
 		assert(env_name in self.pose_to_view_idx)
-		pose = self.get_target_image_pose(env_name, target_idx)
+		pose = self.get_target_pose(env_name, target_idx)
 		view_idx = self.pose_to_view_idx[env_name][pose]
 		return self.feat_dbs[env_name].get_feat(view_idx)
 
