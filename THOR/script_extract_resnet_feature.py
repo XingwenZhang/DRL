@@ -9,22 +9,28 @@ import cPickle
 import THORUtils as utils
 import THORConfig as config
 
+from THOROfflineEnv import ImageDB
+from THOROfflineEnv import FeatureDB
+
 feature_layer_name = 'pool5'
 
-def extract_image_feature(imgs, net, img_transformer):
-    features = []
-    for i in xrange(len(imgs)):
-        net.blobs['data'].data[...] = img_transformer.preprocess('data', imgs[i, :, :, :])
+def extract_image_feature(img_db, net, img_transformer):
+    feat_db = FeatureDB()
+    for i in xrange(img_db.get_size()):
+        print('extracting feature from image {0}/{1}'.format(i, img_db.get_size()))
+        img = img_db.get_img(i)
+        net.blobs['data'].data[...] = img_transformer.preprocess('data', img)
         net.forward(end = feature_layer_name)
-        features.append(net.blobs[feature_layer_name].data.mean(0).mean(1).mean(1))
-    features = numpy.array(features)
-    return features
+        feat = net.blobs[feature_layer_name].data.mean(0).mean(1).mean(1)
+        feat_db.register_feat(feat)
+    feat_db.optimize_memory_layout()
+    return feat_db
 
 if __name__ == '__main__':
 
     # load caffe models
     resnet_root = '../../deep-residual-networks'
-    caffe.set_mode_gpu()
+    # caffe.set_mode_gpu()
     model_def = resnet_root + '/prototxt/ResNet-152-deploy.prototxt'
     model_weights = resnet_root + '/pretrain_models/ResNet-152-model.caffemodel'
 
@@ -49,13 +55,15 @@ if __name__ == '__main__':
     transformer = caffe.io.Transformer({'data': net.blobs['data'].data.shape})
     transformer.set_transpose('data', (2,0,1))  # move image channels to outermost dimension
     transformer.set_mean('data', mu)            # subtract the dataset-mean value in each channel
-    transformer.set_raw_scale('data', 255)      # rescale from [0, 1] to [0, 255]
     transformer.set_channel_swap('data', (2,1,0))  # swap channels from RGB to BGR
 
     # extract features
     for env in config.supported_envs:
         env_path = "%s/%s.env" %(config.env_db_folder, env)
         if os.path.exists(env_path):
-            imgs = utils.load(open(env_path, 'rb'))[0]
-            features = extract_image_feature(imgs, net, transformer)
-            numpy.save("%s/%s_feature.npy" %(config.env_db_folder, env), features)
+            print('loading image db, this might take a while...')
+            blob = utils.load(open(env_path, 'rb'))
+            img_db, mapping = blob
+            feat_db = extract_image_feature(img_db, net, transformer)
+            blob = (feat_db, mapping)
+            numpy.save("%s/%s.feat" %(config.env_feat_folder, env), blob)

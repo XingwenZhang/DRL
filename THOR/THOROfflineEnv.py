@@ -38,6 +38,24 @@ class ImageDB:
 	def optimize_memory_layout(self):
 		self._storage = np.array(self._storage)
 
+class FeatureDB:
+	def __init__(self):
+		self._storage = None
+
+	def get_size(self):
+		return len(self._storage)
+
+	def register_feat(self, feat):
+		self._storage.append(feat)
+		return len(self._storage) - 1	
+
+	def get_feat(self, idx):
+		return self._storage[idx]
+
+	def optimize_memory_layout(self):
+		self._storage = np.array(self._storage)
+
+
 class PoseRecorder:
 	left_transitions = np.array([[0,1], [-1,0], [0,-1], [1,0]])
 	right_transitions = np.array([[0,1], [1,0], [0,-1], [-1,0]])
@@ -121,14 +139,17 @@ class PoseRecorder:
 class EnvSim:
 
 	_images_dbs = {}
+	_feats_dbs = {}
 	_pose_to_observations = {}
 
-	def __init__(self):
+	def __init__(self, feat_mode=False):
 		self._env_name = None
 		self._img_db = None
 		self._pose_recorder = None
 		self._pose_to_observation = None
 		self._env = None
+		self._feat_mode = feat_mode
+		self._feat_db = None
 
 	def build(self):
 		self._env = robosims.server.Controller(player_screen_width=300,
@@ -188,24 +209,37 @@ class EnvSim:
 
 	def reset(self, env_name):
 		assert env_name in config.supported_envs, 'invalid env_name {0}'.format(env_name)
-		if env_name not in EnvSim._images_dbs:
-			print('loading db of scene {0}...'.format(env_name))
-			load_path = os.path.join(config.env_db_folder, env_name + '.env')
-			blob = utils.load(open(load_path,'rb'))
-			EnvSim._images_dbs[env_name] = blob[0]
-			EnvSim._pose_to_observations[env_name] = blob[1]
+		if self._feat_mode:
+			if env_name not in EnvSim._feats_dbs:
+				print('loading db of scene {0}...'.format(env_name))
+				load_path = os.path.join(config.env_feat_folder, env_name + '.feat')
+				blob = utils.load(open(load_path,'rb'))
+				EnvSim._feats_dbs[env_name] = blob[0]
+				EnvSim._pose_to_observations[env_name] = blob[1]
+				self._feat_db = EnvSim._feats_dbs[env_name]
+		else:
+			if env_name not in EnvSim._images_dbs:
+				print('loading db of scene {0}...'.format(env_name))
+				load_path = os.path.join(config.env_db_folder, env_name + '.env')
+				blob = utils.load(open(load_path,'rb'))
+				EnvSim._images_dbs[env_name] = blob[0]
+				EnvSim._pose_to_observations[env_name] = blob[1]
+				self._img_db = EnvSim._images_dbs[env_name]
 		self._env_name = env_name
-		self._img_db = EnvSim._images_dbs[env_name]
 		self._pose_to_observation = EnvSim._pose_to_observations[env_name]
 		self._pose_recorder = PoseRecorder()
-		img_idx = self._pose_to_observation[self._pose_recorder.get_pose()]
-		return self._img_db.get_img(img_idx)
+		idx = self._pose_to_observation[self._pose_recorder.get_pose()]
+		if self._feat_mode:
+			return self._feat_db.get_feat(idx)
+		else:
+			return self._img_db.get_img(idx)
 
 	def pre_load(self):
 		for env_name in config.supported_envs:
 			self.reset(env_name)
 		self._env_name = None
 		self._img_db = None
+		self._feat_db = None
 		self._pose_recorder = None
 		self._pose_to_observation = None
 
@@ -220,12 +254,19 @@ class EnvSim:
 			# reverse
 			reverse_action_idx = get_reverse_action_idx(action_idx)
 			self._pose_recorder.record(reverse_action_idx)
-		img_idx = self._pose_to_observation[self._pose_recorder.get_pose()]
-		return self._img_db.get_img(img_idx), success
+		idx = self._pose_to_observation[self._pose_recorder.get_pose()]
+		if self._feat_mode:
+			return self._feat_db.get_feat(idx), success
+		else:
+			return self._img_db.get_img(idx), success
 
 	def get_pose(self):
 		return self._pose_recorder.get_pose()
 
-	def get_num_images(self):
-		return len(self._img_db)
+	def get_num_views(self):
+		if self._feat_mode:
+			return len(self._feat_db)
+		else:
+			return len(self._img_db)
+
 
