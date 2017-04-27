@@ -58,6 +58,8 @@ if __name__ == '__main__':
     transformer.set_channel_swap('data', (2,1,0))  # swap channels from RGB to BGR
 
     # extract features
+    if not os.path.exists(config.env_feat_folder):
+        os.makedirs(config.env_feat_folder)
     for env in config.supported_envs:
         env_path = "%s/%s.env" %(config.env_db_folder, env)
         feat_path = "%s/%s.feat" %(config.env_feat_folder, env)
