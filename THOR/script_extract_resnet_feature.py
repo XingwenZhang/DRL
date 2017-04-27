@@ -31,8 +31,8 @@ if __name__ == '__main__':
     # load caffe models
     resnet_root = '../../deep-residual-networks'
     # caffe.set_mode_gpu()
-    model_def = resnet_root + '/prototxt/ResNet-152-deploy.prototxt'
-    model_weights = resnet_root + '/pretrain_models/ResNet-152-model.caffemodel'
+    model_def = resnet_root + '/prototxt/ResNet-50-deploy.prototxt'
+    model_weights = resnet_root + '/pretrain_models/ResNet-50-model.caffemodel'
 
     # initialzie models
     net = caffe.Net(model_def,      # defines the structure of the model
@@ -60,10 +60,13 @@ if __name__ == '__main__':
     # extract features
     for env in config.supported_envs:
         env_path = "%s/%s.env" %(config.env_db_folder, env)
-        if os.path.exists(env_path):
-            print('loading image db, this might take a while...')
+        feat_path = "%s/%s.feat" %(config.env_feat_folder, env)
+        #print env_path
+        #print feat_path
+        if os.path.exists(env_path) and not os.path.exists(feat_path):
+            print('loading image db (%s), this might take a while...' %(env))
             blob = utils.load(open(env_path, 'rb'))
             img_db, mapping = blob
             feat_db = extract_image_feature(img_db, net, transformer)
             blob = (feat_db, mapping)
-            numpy.save("%s/%s.feat" %(config.env_feat_folder, env), blob)
+            utils.dump(blob, open(feat_path, 'wb'))
