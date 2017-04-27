@@ -40,7 +40,7 @@ class ImageDB:
 
 class FeatureDB:
 	def __init__(self):
-		self._storage = None
+		self._storage = []
 
 	def get_size(self):
 		return len(self._storage)
