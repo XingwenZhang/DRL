@@ -6,10 +6,13 @@ os.environ['GLOG_minloglevel'] = '2'
 import sys
 import caffe
 import cPickle
+import THORUtils as utils
+import THORConfig as config
 
 def extract_image_feature(imgs, net, img_transformer):
     features = []
     for i in xrange(len(features)):
+        print "extraing image #%05i" %(i)
         net.blobs['data'].data[...] = img_transformer.preprocess('data', imgs[i, :, :, :])
         net.forward(end = 'pool5')
         features.append(net.blobs['pool5'].data.mean(0).mean(1).mean(1))
@@ -17,17 +20,11 @@ def extract_image_feature(imgs, net, img_transformer):
     return features
 
 if __name__ == '__main__':
-    if len(sys.argv) != 3:
-        print "Usage: {0} input_images_npy output_npy".format(sys.argv[0])
-        print "input_images_npy -- path to the input image npy file"
-        print "output_npy -- path to the output feature npy file"
-        exit(1)
-    
     # load caffe models
     resnet_root = '../../deep-residual-networks'
     caffe.set_mode_gpu()
-    model_def = resnet_root + 'prototxt/ResNet-152-deploy.prototxt'
-    model_weights = resnet_root + 'pretrain_models/ResNet-152-model.caffemodel'
+    model_def = resnet_root + '/prototxt/ResNet-152-deploy.prototxt'
+    model_weights = resnet_root + '/pretrain_models/ResNet-152-model.caffemodel'
 
     # initialzie models
     net = caffe.Net(model_def,      # defines the structure of the model
@@ -41,7 +38,7 @@ if __name__ == '__main__':
 
     # load the mean image (as distributed with Caffe) for subtraction
     blob = caffe.proto.caffe_pb2.BlobProto()
-    mu = open( resnet_root + 'resnet_root/ResNet_mean.binaryproto' , 'rb' ).read()
+    mu = open( resnet_root + '/pretrain_models/ResNet_mean.binaryproto' , 'rb' ).read()
     blob.ParseFromString(mu)
     mu = numpy.array( caffe.io.blobproto_to_array(blob) )
     mu = mu.mean(0).mean(1).mean(1)  # average over pixels to obtain the mean (BGR) pixel values
@@ -53,7 +50,10 @@ if __name__ == '__main__':
     transformer.set_raw_scale('data', 255)      # rescale from [0, 1] to [0, 255]
     transformer.set_channel_swap('data', (2,1,0))  # swap channels from RGB to BGR
 
-    # load image here
-    imgs = numpy.load(sys.argv[1])
-    features = extract_image_feature(imgs, net, transformer)
-    numpy.save(sys.argv[2], features)
+    # extract features
+    for env in config.supported_envs:
+        env_path = "%s/%s.env" %(config.env_db_folder, env)
+        if os.path.exists(env_path):
+            imgs = utils.load(open(env_path, 'rb'))[0]
+            features = extract_image_feature(imgs, net, transformer)
+            numpy.save("%s/%s_feature.npy" %(config.env_db_folder, env), features)
