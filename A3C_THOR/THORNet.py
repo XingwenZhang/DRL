@@ -47,26 +47,25 @@ def build_actor_critic_network(scope, num_action, num_scene):
                 fc1, 
                 shape = (-1, (A3CConfig.num_history_frames+1) * 512),
                 name = "fc1_flattened") # (num_histroy_frmae + 1) * n * 512 -> n * (num_histroy_frmae * 512)
-            state_feature = fc1_flattened[:, 0:(A3CConfig.num_history_frames * 512)]
-            state_feature = TFUtil.fc_layer('state_feature', state_feature, input_size=2048, num_neron=512, variable_dict=variable_dict)
-            target_feature = fc1_flattened[:, (A3CConfig.num_history_frames * 512):]
+            #state_feature = fc1_flattened[:, 0:(A3CConfig.num_history_frames * 512)]
+            #state_feature = TFUtil.fc_layer('state_feature', state_feature, input_size=2048, num_neron=512, activation=None, variable_dict=variable_dict)
+            #target_feature = fc1_flattened[:, (A3CConfig.num_history_frames * 512):]
             embedded_feature = TFUtil.fc_layer('embedded_feature',
-                                                tf.concat((state_feature, target_feature), axis = 1), 
-                                                input_size=1024, num_neron=512, variable_dict=variable_dict)
+                                                fc1_flattened, 
+                                                input_size=2560, num_neron=512, variable_dict=variable_dict)
 
         # outputs
         policy_logits_list = []
         policy_prob_list = []
         state_value_list = []
         for i in xrange(num_scene):
-            with tf.variable_scope('scene_layer_%02i' %(i)):
-                with tf.variable_scope('policy_network'):
-                    policy_fc = TFUtil.fc_layer('policy_fc', embedded_feature, input_size=512, num_neron=512, variable_dict=variable_dict) 
-                    policy_logits = TFUtil.fc_layer('policy_logits', policy_fc, input_size=512, num_neron=num_action, activation=None, variable_dict=variable_dict)
-                    policy_probs = tf.nn.softmax(name = 'policy_probs', logits = policy_logits)
-                with tf.variable_scope('value_network'):
-                    value_fc = TFUtil.fc_layer('value_fc', embedded_feature, input_size=512, num_neron=512, variable_dict=variable_dict) 
-                    state_value = tf.squeeze(TFUtil.fc_layer('value', value_fc, input_size=512, num_neron=1, activation=None, variable_dict=variable_dict), axis = 1)                
+            with tf.variable_scope('policy_network_{0:02d}'.format(i)):
+                policy_fc = TFUtil.fc_layer('policy_fc_{0:02d}'.format(i), embedded_feature, input_size=512, num_neron=512, variable_dict=variable_dict) 
+                policy_logits = TFUtil.fc_layer('policy_logits_{0:02d}'.format(i), policy_fc, input_size=512, num_neron=num_action, activation=None, variable_dict=variable_dict)
+                policy_probs = tf.nn.softmax(name = 'policy_probs_{0:02d}'.format(i), logits = policy_logits)
+            with tf.variable_scope('value_network_{0:02d}'.format(i)):
+                value_fc = TFUtil.fc_layer('value_fc_{0:02d}'.format(i), embedded_feature, input_size=512, num_neron=512, variable_dict=variable_dict) 
+                state_value = tf.squeeze(TFUtil.fc_layer('value_{0:02d}'.format(i), value_fc, input_size=512, num_neron=1, activation=None, variable_dict=variable_dict), axis = 1)                
             policy_logits_list.append(policy_logits)
             policy_prob_list.append(policy_probs)
             state_value_list.append(state_value)
@@ -79,10 +78,11 @@ def build_actor_critic_network(scope, num_action, num_scene):
                     name   = 'log_prob',
                     labels = action_placeholder,
                     logits = policy_logits_list[i])
-                policy_loss = - tf.reduce_sum(log_prob * tf.stop_gradient(q_value_placeholder - state_value_list[i]))
-                policy_entropy = - 0.01 * tf.reduce_sum(policy_prob_list[i] * tf.log(policy_prob_list[i] + 1e-20))
+                advantage = tf.stop_gradient(q_value_placeholder - state_value_list[i])
+                policy_loss = - tf.reduce_mean(log_prob * advantage)
+                policy_entropy = - 0.001 * tf.reduce_sum(policy_prob_list[i] * tf.log(policy_prob_list[i] + 1e-20))
                 # value_loss
-                value_loss = 0.1 * tf.reduce_sum(tf.square(q_value_placeholder - state_value_list[i]))
+                value_loss = 1 * tf.reduce_mean(tf.square(q_value_placeholder - state_value_list[i]))
                 # need to tweak weight
                 scene_loss.append(policy_loss + value_loss - policy_entropy)
                 with tf.name_scope('secen_summary_%02i' %(i)): 
@@ -90,7 +90,7 @@ def build_actor_critic_network(scope, num_action, num_scene):
                     tf.summary.scalar('policy_entropy', policy_entropy)
                     tf.summary.scalar('value_loss', value_loss)
 
-            loss = tf.reduce_sum(tf.transpose(scene_loss) * scene_placeholder) # scene_placeholder is a one hot vector
+            loss = tf.reduce_sum(tf.transpose(scene_loss) * scene_placeholder) # scene_placeholder is one-hot vectors
                 
             
             # train_op
@@ -103,14 +103,16 @@ def build_actor_critic_network(scope, num_action, num_scene):
                 decay_rate    = A3CConfig.decay_rate)
             """
             # create optizer
-            optimizer = tf.train.AdamOptimizer(learning_rate = A3CConfig.learning_rate)
-            #optimizer = tf.train.RMSPropOptimizer(learning_rate = A3CConfig.learning_rate, momentum = A3CConfig.momentum)
+            #optimizer = tf.train.AdamOptimizer(learning_rate = A3CConfig.learning_rate)
+            optimizer = tf.train.RMSPropOptimizer(learning_rate = A3CConfig.learning_rate)#, momentum = A3CConfig.momentum)
+            train_op = optimizer.minimize(loss)
 
-            
+            """
             local_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope = scope)
             grad_var = optimizer.compute_gradients(loss, var_list = local_vars)
             
             # optional: gradient clipping
+            
             clipped_grad_var = []
             for grad, var in grad_var:
                 if grad is not None:
@@ -118,6 +120,7 @@ def build_actor_critic_network(scope, num_action, num_scene):
                 else:
                     clipped_grad_var.append((None, var))
             grad_var = clipped_grad_var
+            
                 
             
             if scope != 'global':
@@ -129,6 +132,7 @@ def build_actor_critic_network(scope, num_action, num_scene):
                     
                 
             train_op = optimizer.apply_gradients(grad_var)
+            """
 
         # ops to sample_action using multinomial distribution given unnomalized log probability logits
         action_sampler_ops = []

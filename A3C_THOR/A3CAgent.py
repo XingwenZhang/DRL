@@ -39,7 +39,6 @@ class A3CAgent:
 
         self._num_actions = len(THORConfig.supported_actions)
         self._episode_reward_buffer = deque(maxlen=100)
-        self._episode_reward_buffer.append(0)
         self._episode_step_buffer = deque(maxlen=100)
 
         #self._replay_memory = PGUtil.ExperienceReplayMemory(A3CConfig.replay_memory)
@@ -118,6 +117,8 @@ class A3CAgent:
                         for thread_id in xrange(self._num_threads)]
         for t in learner_threads:
             t.start()
+        for t in learner_threads:
+            t.join()
 
         print('Training started, please open Tensorboard to monitor the training process.')
         # Show the agents training and write summary statistics
@@ -130,8 +131,6 @@ class A3CAgent:
                 writer.add_summary(summary_str, float(T))
                 last_summary_time = now
         """
-        for t in learner_threads:
-            t.join()
 
 
 
@@ -150,7 +149,7 @@ class A3CAgent:
         """
 
         state = self._request_new_episode(env)
-        print "Target idx:", env._target_idx
+        print "Env id: ", env._env_idx, "Target idx: ", env._target_idx
         history_buffer = A3CUtil.HistoryBuffer()
         total_rewards = 0
         total_steps = 0
@@ -210,7 +209,7 @@ class A3CAgent:
                 total_rewards = 0
                 # reset
                 state = self._request_new_episode(env)
-                print "Target idx:", env._target_idx
+                print "Env id: ", env._env_idx, "Target idx: ", env._target_idx
 
             # record summary
             self._summary_writer.add_summary(summary, global_step = self._iter_idx)
