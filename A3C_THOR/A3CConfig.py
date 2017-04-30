@@ -7,7 +7,7 @@ max_iterations = 10000000
 discounted_factor = 0.99
 
 # learning rate
-learning_rate = 1e-3
+learning_rate = 7e-4
 decay_rate = 0.5
 decay_step = 100000
 momentum = 0.8

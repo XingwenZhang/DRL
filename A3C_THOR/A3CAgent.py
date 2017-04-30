@@ -51,6 +51,7 @@ class A3CAgent:
         self._tf_resnet_output = None
         self._tf_global_step = None
         self._tf_acn_state = None
+        self._tf_acn_target = None
         self._tf_acn_image_feature = None
         self._tf_acn_action = None
         self._tf_acn_q_value = None
@@ -148,7 +149,7 @@ class A3CAgent:
         self._copy_network_var(from_scope = 'global', to_scope = scope)
         """
 
-        state = self._request_new_episode(env)
+        state, target = self._request_new_episode(env)
         print "Env id: ", env._env_idx, "Target idx: ", env._target_idx
         history_buffer = A3CUtil.HistoryBuffer()
         total_rewards = 0
@@ -159,8 +160,9 @@ class A3CAgent:
                 action = self._select_action(
                     env = env,
                     state = state,
+                    target = target,
                     i = self._iter_idx)
-                next_state, reward, done = self._perform_action(env, state, action, history_buffer)
+                next_state, reward, done = self._perform_action(env, state, target, action, history_buffer)
                 total_rewards += reward
                 state = next_state
                 #if reward != 0: # Pong has either +1 or -1 reward exactly when game ends.
@@ -171,7 +173,8 @@ class A3CAgent:
 
             value = 0 if done else self._tf_sess.run(
                 self._tf_acn_state_value_list[env._env_idx],
-                feed_dict = {self._tf_acn_state: state})[0]
+                feed_dict = {self._tf_acn_state: state, 
+                             self._tf_acn_target: target})[0]
 
 
             # update models
@@ -186,6 +189,7 @@ class A3CAgent:
             self._tf_sess.run([self._tf_acn_train_op, self._tf_average_reward, self._tf_average_step, self._tf_summary_op],
                             feed_dict={ self._tf_global_step   : self._iter_idx,
                                         self._tf_acn_state     : states,
+                                        self._tf_acn_target    : np.tile(target, (len(actions), 1)),
                                         self._tf_acn_action    : actions,
                                         self._tf_acn_q_value   : q_values,
                                         self._tf_acn_sence     : scene_one_hot,
@@ -208,7 +212,7 @@ class A3CAgent:
                 print("Average reward for last 100 episodes: {}".format(np.mean(self._episode_reward_buffer)))
                 total_rewards = 0
                 # reset
-                state = self._request_new_episode(env)
+                state, target = self._request_new_episode(env)
                 print "Env id: ", env._env_idx, "Target idx: ", env._target_idx
 
             # record summary
@@ -260,7 +264,7 @@ class A3CAgent:
         
         placeholders, ops, variables = THORNet.build_actor_critic_network(scope, self._num_actions, self._num_scenes)
         if scope == 'global':
-            self._tf_global_step, self._tf_acn_state, self._tf_acn_action, self._tf_acn_q_value, \
+            self._tf_global_step, self._tf_acn_state, self._tf_acn_target, self._tf_acn_action, self._tf_acn_q_value, \
             self._tf_acn_sence, self._tf_reward_history, self._tf_step_history = placeholders
             self._tf_acn_train_op, self._tf_action_samplers = ops
             self._tf_acn_policy_logit_list, self._tf_acn_state_value_list, self._tf_average_reward, self._tf_average_step = variables
@@ -281,7 +285,7 @@ class A3CAgent:
         for from_var,to_var in zip(from_vars,to_vars):
             to_var.assign(from_var)
 
-    def _select_action(self, env, state, i, test_mode = False):
+    def _select_action(self, env, state, target, i, test_mode = False):
         if test_mode:
             exploration_prob = A3CConfig.test_exploration
         else:
@@ -297,15 +301,17 @@ class A3CAgent:
                 #action = np.argmax(self._tf_sess.run(, {network_state_op: state})[0])
                 action = np.argmax(self._tf_sess.run(
                     self._tf_policy_logits_list[env._env_idx],
-                    {self._tf_acn_state: state})[0])
+                    {self._tf_acn_state: state,
+                     self._tf_acn_target: target})[0])
             else:
                 #action = self._tf_sess.run(sampler_op, {network_state_op: state})[0][0]
                 action = self._tf_sess.run(
                     self._tf_action_samplers[env._env_idx],
-                    {self._tf_acn_state: state})[0][0]
+                    {self._tf_acn_state: state,
+                     self._tf_acn_target: target})[0][0]
         return action
 
-    def _perform_action(self, env, state, action, history_buffer):
+    def _perform_action(self, env, state, target, action, history_buffer):
         if not self._feature_mode:
             # perfrom action and get next frame
             next_frame, _, reward, done = env.step(action)
@@ -313,20 +319,17 @@ class A3CAgent:
             next_frame_feat = self._tf_sess.run(
                 self._tf_resnet_output, 
                 {self._tf_resnet_input: next_frame[np.newaxis, :, :, :]})
-            next_state = np.concatenate(
-                (state[1:A3CConfig.num_history_frames, :], next_frame_feat, state[-1:, :]),
-                axis = 0)
+            next_state = np.concatenate((state[1:, :], next_frame_feat), axis = 0)
         else:
             # perfrom action, get next frame idx, and retrieve the feature from table
-            next_state, _, reward, done = env.step(action)
-            next_state = np.concatenate(
-                (state[1:A3CConfig.num_history_frames, :], next_state[np.newaxis, :], state[-1:, :]),
-                axis = 0)
+            next_feature, _, reward, done = env.step(action)
+            next_state = np.concatenate((state[1:, :], next_feature[np.newaxis, :]),axis = 0)
         # get the value of the current state
         #value = self._tf_sess.run( value_op, feed_dict = {state_op: state})[0]
         value = self._tf_sess.run(
             self._tf_acn_state_value_list[env._env_idx],
-            {self._tf_acn_state: state}
+            {self._tf_acn_state: state, 
+             self._tf_acn_target: target}
             )[0]
         
         # store roll out
@@ -344,13 +347,13 @@ class A3CAgent:
             state = np.tile(state, (A3CConfig.num_history_frames, 1))
             target = self._tf_sess.run(self._tf_resnet_output,
                                     {self._tf_resnet_input: self.preprocess_frame(env._target_img)[np.newaxis, :, :, :]})
-            state = np.concatenate((state, target), axis = 0)
+            target = np.tile(target, (A3CConfig.num_history_frames, 1))
         else:
-            feature = env.reset_random()
-            state = np.tile(feature[np.newaxis, :], (A3CConfig.num_history_frames, 1))
-            target = env.get_target_feat() 
-            state = np.concatenate((state, target[np.newaxis, :]), axis = 0)
-        return state
+            state_feature = env.reset_random()
+            state = np.tile(state_feature[np.newaxis, :], (A3CConfig.num_history_frames, 1))
+            target_feature = env.get_target_feat()
+            target = np.tile(target_feature[np.newaxis, :], (A3CConfig.num_history_frames, 1))
+        return state, target
 
     def _perform_random_action(self):
         pass
