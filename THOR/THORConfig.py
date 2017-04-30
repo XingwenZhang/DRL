@@ -15,8 +15,8 @@ darwin_build=THOR_HOME + '/thor_binary/thor-cmu-201703101557-OSXIntel64.app/Cont
 linux_build=THOR_HOME + '/thor_binary/thor-cmu-201703101558-Linux64'
 x_display="0.0"
 
-#supported_envs = ['FloorPlan224']
-supported_envs = ['FloorPlan224', 'FloorPlan225']
+supported_envs = ['FloorPlan224']
+#supported_envs = ['FloorPlan224', 'FloorPlan225']
 
 # supported_actions = ['MoveAhead', 'MoveBack']
 # supported_actions = ['MoveAhead', 'MoveBack', 'MoveLeft', 'MoveRight']

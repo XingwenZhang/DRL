@@ -36,7 +36,7 @@ class THOREnvironment:
         if config.display:
             if not self._feat_mode:
                 self.render(observation, 'cur_frame')
-        return observation, action_success, reward, self._done
+        return observation, reward, self._done, action_success
 
     def reset(self, env_idx, target_idx):
         assert(self._done)
