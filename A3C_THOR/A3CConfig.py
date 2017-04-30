@@ -1,13 +1,13 @@
 import tensorflow as tf
 
 # max iterations for training (-1 means forever)
-max_iterations = 500000
+max_iterations = 10000000
 
 # discounted factor
 discounted_factor = 0.99
 
 # learning rate
-learning_rate = 1e-4
+learning_rate = 7e-4
 decay_rate = 0.5
 decay_step = 100000
 momentum = 0.8
@@ -16,14 +16,14 @@ momentum = 0.8
 decay = 0.99
 
 # epsilon greedy exploration
-initial_exploration = 0.5
+initial_exploration = 1.0
 final_exploration = 0.0
-final_exploration_frame = 20000
+final_exploration_frame = 200000
 exploration_change_rate = (final_exploration - initial_exploration)/final_exploration_frame
 test_exploration = 0.0
 
 # max_step, max number of step
-max_steps = 32
+max_steps = 5
 
 # batch_size
 batch_size = 1
