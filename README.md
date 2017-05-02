@@ -58,6 +58,12 @@ Deep Reinforcement Learning
 		```
 
 		The extracted feature will be saved **to** `THOR/env_feat_a4`
+		
+		**Or** you can download envrionment features with the following commands
+		
+		```
+		./get_env_feat.sh
+		```
 	
 + **HumanControledAgent**
 
