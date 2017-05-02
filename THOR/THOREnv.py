@@ -112,7 +112,7 @@ class THOREnvironment:
         assert(self._target_img_pose is not None)
         cur_location, _, _ = self._env.get_pose()
         target_location, _, _ = self._target_img_pose
-        dist = np.sum(np.abs(cur_location - target_location))
+        dist = abs(cur_location[0] - target_location[0]) + abs(cur_location[1] - target_location[1])
         return dist
 
     @staticmethod
