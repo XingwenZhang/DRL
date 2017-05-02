@@ -25,8 +25,12 @@ Deep Reinforcement Learning
 		python script_build_db.py
 		```
 	
-		**Or** you can download the environment DBs from [here](https://cmu.box.com/s/udt9zltav06qvga56f1envt8ock6byo6) and put them under `THOR/env_db_a4` folder.
-
+		**Or** you can download the environment DBs with the following commands
+		
+		```
+		./get_env_db.sh
+		```
+		
 	+ Randomly collect target images in the scene
 	
 		```	
@@ -35,9 +39,13 @@ Deep Reinforcement Learning
 	
 		```
 		
-		**Or** you can download target images from [here](https://cmu.box.com/s/fy49k0zo6hhumxld0fp3r6h7biow5rld) and decompress it **to** `THOR/target_images` folder.
-	
-	+Extract RESNET Feature**
+		**Or** you can download target images with the following commands
+		
+		```
+		./get_target_images.sh 
+		```
+			
+	+ Extract ResNet Feature
 
 		This is to extract Resnet feature for offline environment feature mode. 
 
@@ -60,16 +68,5 @@ Deep Reinforcement Learning
 	```
 	![](pics/HumanAgent.png)
 	
-	+ commands:
-		
-		| cmd| action name|
-		|---|-------------|
-		|`w`| MoveForward |
-		|`s`| MoveBackward|
-		|`a`| MoveLeft    |
-		|`d`| MoveRight   |
-		|`j`| RotateRight |
-		|`l`| RotateLeft  |
-		|`i`| LookUp      |
-		|`k`| LookDown    |
+
 	
