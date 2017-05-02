@@ -17,9 +17,9 @@ def unpack_thor_event(event):
 	success = event.metadata['lastActionSuccess']
 	return frame, success
 
-def get_reverse_action_idx(action_idx):
-	reverse_action_idx = action_idx + 1 if action_idx % 2 == 0 else action_idx - 1
-	return reverse_action_idx
+def get_reverse_action(action):
+	assert(action in config.action_reverse_table)
+	return config.action_reverse_table[action]
 
 class ImageDB:
 	def __init__(self):
@@ -67,9 +67,7 @@ class PoseRecorder:
 	def reset(self):
 		self._cur_location = np.array([0,0])
 
-	def record(self, action_idx):
-		assert 0 <= action_idx < len(config.supported_actions), 'action_idx {0} is invalid'.format(action_idx)
-		action_str = config.supported_actions[action_idx]
+	def record(self, action_str):
 		if action_str == 'MoveAhead':
 			self._move_ahead()
 		elif action_str == 'MoveBack':
@@ -170,6 +168,7 @@ class EnvSim:
 			img, _ = unpack_thor_event(event)
 			img_idx = self._img_db.register_img(img)
 			self._pose_to_observation[self._pose_recorder.get_pose()] = img_idx
+			self._collect_all_other_views_at_cur_position()
 			# dfs scene traversal
 			self._dfs_traverse_scene()
 			print 'total: {0} images collected'.format(self._img_db.get_size())
@@ -181,31 +180,43 @@ class EnvSim:
 			utils.dump(blob, open(dump_path,'wb'))
 
 	def _dfs_traverse_scene(self):
-		for action_idx in range(len(config.supported_actions)):
+		for action_str in config.position_actions:
 			# early cut-off if the resulting pose is visited
-			self._pose_recorder.record(action_idx)
+			self._pose_recorder.record(action_str)
 			future_pose = self._pose_recorder.get_pose()
-			self._pose_recorder.record(get_reverse_action_idx(action_idx))
+			self._pose_recorder.record(get_reverse_action(action_str))
 			if future_pose in self._pose_to_observation:
 				continue
-
-			action_str = config.supported_actions[action_idx]
+			
 			event = self._env.step(dict(action=action_str))
 			img, success = unpack_thor_event(event)
 			if success:
-				self._pose_recorder.record(action_idx)
+				self._pose_recorder.record(action_str)
 				pose = self._pose_recorder.get_pose()
 				if pose not in self._pose_to_observation:
 					img_idx = self._img_db.register_img(img)
 					self._pose_to_observation[pose] = img_idx
+					self._collect_all_other_views_at_cur_position()
 					if self._img_db.get_size() % 100 == 0:
 						print '{0} images collected'.format(self._img_db.get_size())
 					self._dfs_traverse_scene()
 				# back-tracking
-				reverse_action_idx = get_reverse_action_idx(action_idx)
-				reverse_action_str = config.supported_actions[reverse_action_idx]
+				reverse_action_str = get_reverse_action(action_str)
 				self._env.step(dict(action=reverse_action_str))
-				self._pose_recorder.record(reverse_action_idx)
+				self._pose_recorder.record(reverse_action_str)
+
+	def _collect_all_other_views_at_cur_position(self):
+		for _ in range(3):
+			event = self._env.step(dict(action='RotateLeft'))
+			self._pose_recorder.record('RotateLeft')
+			pose = self._pose_recorder.get_pose()
+			assert(pose not in self._pose_to_observation)
+			img, success = unpack_thor_event(event)
+			img_idx = self._img_db.register_img(img)
+			assert(success)
+			self._pose_to_observation[pose] = img_idx
+		self._env.step(dict(action='RotateLeft'))
+		self._pose_recorder.record('RotateLeft')
 
 	def reset(self, env_name):
 		assert env_name in config.supported_envs, 'invalid env_name {0}'.format(env_name)
@@ -218,7 +229,7 @@ class EnvSim:
 				EnvSim._pose_to_observations[env_name] = blob[1]
 				self._feat_db = EnvSim._feats_dbs[env_name]
 			else:
-    				self._feat_db = EnvSim._feats_dbs[env_name]
+				self._feat_db = EnvSim._feats_dbs[env_name]
 		else:
 			if env_name not in EnvSim._images_dbs:
 				print('loading db of scene {0}...'.format(env_name))
@@ -247,14 +258,14 @@ class EnvSim:
 	def step(self, action_idx):
 		assert 0 <= action_idx < len(config.supported_actions), 'invalid action_idx {0}'.format(action_idx)
 		success = False
-		self._pose_recorder.record(action_idx)
+		action_str = config.supported_actions[action_idx]
+		self._pose_recorder.record(action_str)
 		# do a dry run and see if it succeeds
 		future_pose = self._pose_recorder.get_pose()
 		success = future_pose in self._pose_to_observation
 		if not success:
-			# reverse
-			reverse_action_idx = get_reverse_action_idx(action_idx)
-			self._pose_recorder.record(reverse_action_idx)
+			reverse_action_str = get_reverse_action(action_str)
+			self._pose_recorder.record(reverse_action_str)
 		idx = self._pose_to_observation[self._pose_recorder.get_pose()]
 		if self._feat_mode:
 			return self._feat_db.get_feat(idx), success

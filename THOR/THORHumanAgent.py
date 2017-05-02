@@ -11,7 +11,7 @@ import cv2
 commands = {'w':'MoveAhead', 's':'MoveBack', 'a':'MoveLeft', 'd':'MoveRight',
 			'j':'RotateLeft','l':'RotateRight', 'i':'LookUp', 'k':'LookDown'}
 
-feat_mode = True
+feat_mode = False
 
 thor_env = THOREnvironment(feat_mode = feat_mode)
 thor_env.pre_load(feat_mode)
@@ -35,13 +35,17 @@ while True:
 		continue
 	action_name = commands[command_chr]
 	if action_name not in config.supported_actions:
+		print('invalid action.')
+		continue
+	if action_name not in config.supported_actions:
 		print('{0} is not supported.'.format(action_name))
 	action_idx = config.supported_actions_idx[action_name]
-	observation, action_success, reward, done = thor_env.step(action_idx)
-	print(observation)
+	observation, reward, done, action_success = thor_env.step(action_idx)
+	print('reward: ' + str(reward))
 	if reward > 0:
-		print('found !')
+		print('found!')
 		assert(done)
 	if done:
 		break
 print('total_episode_reward: ' + str(thor_env.get_total_episode_reward()))
+cv2.waitKey()

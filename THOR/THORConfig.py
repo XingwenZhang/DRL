@@ -4,7 +4,7 @@ import os
 assert 'THOR_HOME' in os.environ, 'please first set env_var THOR_HOME as the absolute path of DRL/THOR'
 
 # open display
-display = False
+display = True
 
 # size of the input image to the network
 net_input_width=224
@@ -16,12 +16,16 @@ linux_build=THOR_HOME + '/thor_binary/thor-cmu-201703101558-Linux64'
 x_display="0.0"
 
 supported_envs = ['FloorPlan224']
-#supported_envs = ['FloorPlan224', 'FloorPlan225']
+# supported_envs = ['FloorPlan224', 'FloorPlan225']
 
-# supported_actions = ['MoveAhead', 'MoveBack']
-# supported_actions = ['MoveAhead', 'MoveBack', 'MoveLeft', 'MoveRight']
+action_reverse_table = {'MoveAhead': 'MoveBack',
+						'MoveBack': 'MoveAhead',
+						'RotateLeft': 'RotateRight',
+						'RotateRight': 'RotateLeft',
+						'MoveLeft': 'MoveRight',
+						'MoveRight': 'MoveLeft'}
+position_actions = ['MoveAhead', 'MoveBack', 'MoveLeft', 'MoveRight']
 supported_actions = ['MoveAhead', 'MoveBack', 'RotateLeft', 'RotateRight']
-# supported_actions = ['MoveAhead', 'MoveBack', 'MoveLeft', 'MoveRight', 'RotateLeft', 'RotateRight', 'LookUp', 'LookDown']
 
 # build action to idx mapping
 supported_actions_idx = {}
