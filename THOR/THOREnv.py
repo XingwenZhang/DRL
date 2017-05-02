@@ -23,7 +23,9 @@ class THOREnvironment:
 
     def step(self, action_idx):
         assert(not self._done)
+        prev_distance = self.get_L1_distance_to_target()
         observation, action_success = self._env.step(action_idx)
+        cur_distance = self.get_L1_distance_to_target()
         self._step_count += 1
         if self._check_found_target(observation):
             self._done = True
@@ -31,6 +33,9 @@ class THOREnvironment:
         else:
             if action_success:
                 reward = config.reward_notfound
+                if config.use_distance_reward:
+                    if cur_distance < prev_distance:
+                        reward += config.distance_decrease_reward
             else:
                 reward = config.reward_notfound_notsuccess
         if self._step_count == config.episode_max_steps:
@@ -102,6 +107,13 @@ class THOREnvironment:
 
     def get_steps_count(self):
         return self._step_count
+
+    def get_L1_distance_to_target(self):
+        assert(self._target_img_pose is not None)
+        cur_location, _, _ = self._env.get_pose()
+        target_location, _, _ = self._target_img_pose
+        dist = np.sum(np.abs(cur_location - target_location))
+        return dist
 
     @staticmethod
     def pre_load(feat_mode):

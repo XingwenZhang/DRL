@@ -52,7 +52,9 @@ episode_max_steps = 10000
 # reward received
 reward_notfound = -0.01
 reward_found = 10.0
-reward_notfound_notsuccess = -0.015
+reward_notfound_notsuccess = -0.015	# don't hit the wall, it hurts
+use_distance_reward = True
+distance_decrease_reward = 0.005	# if distance decreases, you receive additional reward
 
 # debug options:
 diable_random_start = True
