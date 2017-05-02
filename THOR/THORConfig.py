@@ -48,4 +48,7 @@ episode_max_steps = 10000
 # reward received
 reward_notfound = -0.01
 reward_found = 10.0
+reward_notfound_notsuccess = -0.015
 
+# debug options:
+diable_random_start = True

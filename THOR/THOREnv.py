@@ -29,7 +29,10 @@ class THOREnvironment:
             self._done = True
             reward = config.reward_found
         else:
-            reward = config.reward_notfound
+            if action_success:
+                reward = config.reward_notfound
+            else:
+                reward = config.reward_notfound_notsuccess
         if self._step_count == config.episode_max_steps:
             self._done = True
         self._total_episode_reward += reward
@@ -48,9 +51,10 @@ class THOREnvironment:
         env_name = config.supported_envs[self._env_idx]
         self._target_img = self._target_img_mgr.get_target_image(env_name, self._target_idx)
         self._target_img_pose = self._target_img_mgr.get_target_pose(env_name, self._target_idx)
-        observation = self._env.reset(env_name)
-        for _ in range(random.randrange(0, config.random_start + 1)):
-            observation, _ = self._env.step(random.randrange(0, self.get_num_actions()))
+        observation = self._env.reset(env_name)    
+        if not config.diable_random_start:
+            for _ in range(random.randrange(0, config.random_start + 1)):
+                observation, _ = self._env.step(random.randrange(0, self.get_num_actions()))
         self._total_episode_reward = 0
         self._step_count = 0
         self._done = False
@@ -95,6 +99,9 @@ class THOREnvironment:
 
     def get_total_episode_reward(self):
         return self._total_episode_reward
+
+    def get_steps_count(self):
+        return self._step_count
 
     @staticmethod
     def pre_load(feat_mode):
