@@ -60,7 +60,7 @@ class THORTargetManager:
 				if not success:
 					break
 			# check low contrast
-			if skimage.exposure.is_low_contrast(frame):
+			if skimage.exposure.is_low_contrast(frame, fraction_threshold=0.2):
 				continue
 			# check duplication in terms of appearance
 			if i !=0:

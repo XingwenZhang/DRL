@@ -1,10 +1,20 @@
 mkdir -p thor_binary
 cd thor_binary
-wget --no-check-certificate https://s3-us-west-2.amazonaws.com/ai2-vision-robosims/builds/thor-cmu-201703101558-Linux64.zip
-wget --no-check-certificate https://s3-us-west-2.amazonaws.com/ai2-vision-robosims/builds/thor-cmu-201703101557-OSXIntel64.zip
-unzip thor-cmu-201703101558-Linux64.zip
-unzip thor-cmu-201703101557-OSXIntel64.zip
-rm thor-cmu-201703101558-Linux64.zip
-rm thor-cmu-201703101557-OSXIntel64.zip
+
+# download OS-X build
+wget --no-check-certificate https://s3-us-west-2.amazonaws.com/ai2-vision-robosims/builds/thor-201705011400-OSXIntel64.zip
+unzip thor-201705011400-OSXIntel64.zip
+rm thor-201705011400-OSXIntel64.zip
+
+# download Linux build
+wget --no-check-certificate https://s3-us-west-2.amazonaws.com/ai2-vision-robosims/builds/thor-201705011400-Linux64.zip
+unzip thor-201705011400-Linux64.zip
+rm thor-201705011400-Linux64.zip
+
+# download Target Annotation
+wget --no-check-certificate https://s3-us-west-2.amazonaws.com/ai2-vision-robosims/builds/thor-challenge-targets.zip
+unzip thor-challenge-targets.zip
+rm thor-challenge-targets.zip
+
 cd ..
 echo done.

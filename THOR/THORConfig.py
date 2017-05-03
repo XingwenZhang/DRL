@@ -4,19 +4,19 @@ import os
 assert 'THOR_HOME' in os.environ, 'please first set env_var THOR_HOME as the absolute path of DRL/THOR'
 
 # open display
-display = False
+display = True
 
 # size of the input image to the network
 net_input_width=224
 net_input_height=224
 
-THOR_HOME=os.environ['THOR_HOME']
-darwin_build=THOR_HOME + '/thor_binary/thor-cmu-201703101557-OSXIntel64.app/Contents/MacOS/thor-cmu-201703101557-OSXIntel64'
-linux_build=THOR_HOME + '/thor_binary/thor-cmu-201703101558-Linux64'
+THOR_HOME = os.environ['THOR_HOME']
+binary_build = THOR_HOME + '/thor_binary/thor-201705011400-OSXIntel64.app/Contents/MacOS/thor-201705011400-OSXIntel64'
+target_folder = THOR_HOME + '/thor_binary/thor-challenge-targets/targets-train.json'
+linux_build='not supported'
 x_display="0.0"
 
-supported_envs = ['FloorPlan224']
-# supported_envs = ['FloorPlan224', 'FloorPlan225']
+supported_envs = ['env_t1']
 
 action_reverse_table = {'MoveAhead': 'MoveBack',
 						'MoveBack': 'MoveAhead',

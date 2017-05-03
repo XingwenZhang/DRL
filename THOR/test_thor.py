@@ -1,5 +1,8 @@
 #!/usr/bin/env python
-import robosims.server
+import robosims
+import json
+import THORConfig as config
+from THOROfflineEnv import PoseRecorder
 
 actions = {'a': 'MoveLeft',
            'd': 'MoveRight',
@@ -10,21 +13,21 @@ actions = {'a': 'MoveLeft',
            'i': 'LookUp',
            'k': 'LookDown'}
 
-env = robosims.server.Controller(
-        player_screen_width=300,
-        player_screen_height=300,
-        darwin_build='thor_binary/thor-cmu-201703101557-OSXIntel64.app/Contents/MacOS/thor-cmu-201703101557-OSXIntel64',
-        linux_build='thor_binary/thor-cmu-201703101558-Linux64',
-        x_display="0.0")
-
+recorder = PoseRecorder()
+env = robosims.controller.ChallengeController(unity_path=config.binary_build)
 env.start()
-env.reset('FloorPlan224') # FloorPlan223 and FloorPlan224 are also available
-
+t = json.loads(open(config.target_folder).read())
+env.initialize_target(t[1])
+env.step(action=dict(action='LookDown'))
 while True:
-    action = raw_input()
-    if action not in actions:
-        continue
-    event = env.step(dict(action=actions[action]))
-    print(event.metadata['lastActionSuccess'])
-    print(event.metadata)
+  action_command = raw_input()
+  if action_command not in actions:
+      continue
+  action_name = actions[action_command]
+  event = env.step(action=dict(action=action_name))
+
+  if event.metadata['lastActionSuccess']:
+    recorder.record(action_name)
+  print(recorder.get_pose())
+  print(event.metadata['lastActionSuccess'])
 env.stop()

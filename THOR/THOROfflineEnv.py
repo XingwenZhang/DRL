@@ -2,10 +2,11 @@
 by creating & loading a frame databse of THOR
 """
 import os
+import json
 import numpy as np
 import skimage
 import skimage.transform
-import robosims.server
+import robosims
 import THORConfig as config
 import THORUtils as utils
 
@@ -150,12 +151,10 @@ class EnvSim:
 		self._feat_db = None
 
 	def build(self):
-		self._env = robosims.server.Controller(player_screen_width=300,
-											   player_screen_height=300,
-			                                   darwin_build=config.darwin_build,
-			                                   linux_build=config.linux_build,
-			                                   x_display=config.x_display)
+		self._env = robosims.controller.ChallengeController(unity_path=config.binary_build)
 		self._env.start()
+		t = json.loads(open(config.target_folder).read())
+		self._env.initialize_target(t[1])
 		for self._env_name in config.supported_envs:
 			# reset 
 			print('building db of environment {0}...'.format(self._env_name))
@@ -163,7 +162,7 @@ class EnvSim:
 			self._pose_recorder = PoseRecorder()
 			self._pose_to_observation = {}
 			# initial observation
-			event = self._env.reset(self._env_name)
+			event = self._env.step(action=dict(action='LookDown')) # nasty hack
 			self._pose_recorder.reset()
 			img, _ = unpack_thor_event(event)
 			img_idx = self._img_db.register_img(img)
@@ -187,7 +186,6 @@ class EnvSim:
 			self._pose_recorder.record(get_reverse_action(action_str))
 			if future_pose in self._pose_to_observation:
 				continue
-			
 			event = self._env.step(dict(action=action_str))
 			img, success = unpack_thor_event(event)
 			if success:
@@ -202,10 +200,13 @@ class EnvSim:
 					self._dfs_traverse_scene()
 				# back-tracking
 				reverse_action_str = get_reverse_action(action_str)
-				self._env.step(dict(action=reverse_action_str))
+				event = self._env.step(dict(action=reverse_action_str))
+				_, success = unpack_thor_event(event)
+				assert success
 				self._pose_recorder.record(reverse_action_str)
-
+				
 	def _collect_all_other_views_at_cur_position(self):
+		prev_pose = self._pose_recorder.get_pose()
 		for _ in range(3):
 			event = self._env.step(dict(action='RotateLeft'))
 			self._pose_recorder.record('RotateLeft')
@@ -217,6 +218,8 @@ class EnvSim:
 			self._pose_to_observation[pose] = img_idx
 		self._env.step(dict(action='RotateLeft'))
 		self._pose_recorder.record('RotateLeft')
+		cur_pose = self._pose_recorder.get_pose()
+		assert(cur_pose == prev_pose)
 
 	def reset(self, env_name):
 		assert env_name in config.supported_envs, 'invalid env_name {0}'.format(env_name)
