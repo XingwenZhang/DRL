@@ -69,7 +69,7 @@ def build_actor_critic_network(scope, num_action, num_scene):
         for i in xrange(num_scene):
             with tf.variable_scope(THORConfig.supported_envs[i], reuse = False):
                 # fc3 shared for policy and value output
-                fc3 = TFUtil.fc_layer('fc_3'.format(i), fc2, input_size=512, num_neron=512, variable_dict=variable_dict)
+                fc3 = TFUtil.fc_layer('fc_3_{0}'.format(i), fc2, input_size=512, num_neron=512, variable_dict=variable_dict)
                 # policy output
                 policy_logits = TFUtil.fc_layer('policy_logits', fc3, input_size=512, num_neron=num_action, activation=None, variable_dict=variable_dict)
                 policy_probs = tf.nn.softmax(name = 'policy_probs', logits = policy_logits)
@@ -113,10 +113,18 @@ def build_actor_critic_network(scope, num_action, num_scene):
             """
             # create optizer
             #optimizer = tf.train.AdamOptimizer(learning_rate = A3CConfig.learning_rate)
-            optimizer = tf.train.RMSPropOptimizer(learning_rate = A3CConfig.learning_rate)#, momentum = A3CConfig.momentum)
+            optimizer = tf.train.RMSPropOptimizer(learning_rate = A3CConfig.learning_rate, decay = A3CConfig.decay_rate, epsilon = 0.1)#, momentum = A3CConfig.momentum)
             train_ops = []
             for i in xrange(num_scene):
-                train_ops.append(optimizer.minimize(scene_loss[i]))
+                clipped_grad_var = []
+                grad_var = optimizer.compute_gradients(scene_loss[i])
+                for grad, var in grad_var:
+                    if grad is not None:
+                        clipped_grad_var.append((tf.clip_by_value(grad, -10., 10.), var))
+                    else:
+                        clipped_grad_var.append((None, var))
+                grad_var = clipped_grad_var
+                train_ops.append(optimizer.apply_gradients(grad_var))
 
             """
             local_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope = scope)

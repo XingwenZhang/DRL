@@ -202,8 +202,8 @@ class A3CAgent:
                                         self._tf_acn_q_value   : q_values,
                                         self._tf_acn_advantage : advantage,
                                         self._tf_acn_sence     : scene_one_hot,
-                                        self._tf_reward_history: self._episode_reward_buffer,
-                                        self._tf_step_history  : self._episode_step_buffer
+                                        self._tf_reward_history: [self._episode_reward_buffer[-1]],
+                                        self._tf_step_history  : [self._episode_step_buffer[-1]]
                                         })
             #self._copy_network_var(from_scope = 'global', to_scope = scope)
             history_buffer.clean_up()
@@ -229,7 +229,7 @@ class A3CAgent:
             self._iter_idx += 1
             if self._iter_idx % self._model_save_freq == 0 or self._iter_idx == A3CConfig.max_iterations:
                 print("Model saved after {} iterations".format(self._iter_idx))
-                self.save(self._model_save_path, global_step = self._num_frames)
+                self.save(self._model_save_path, global_step = self._iter_idx)
 
 
     def test(self, check_point, use_gpu, gpu_id=None):
@@ -247,13 +247,13 @@ class A3CAgent:
         # start new episode
         episode_idx = 0
         total_rewards = 0
-        state = self._request_new_episode(env)
+        state, target = self._request_new_episode(env)
 
         # perform testing
         while episode_idx <= A3CConfig.max_iterations:
             # sample and perform action, store history
-            action = self._select_action(env, state, episode_idx, test_mode = True)
-            next_state, reward, done = self._perform_action(env, state, action, history_buffer)
+            action = self._select_action(env, state, target, episode_idx, test_mode = True)
+            next_state, reward, done = self._perform_action(env, state, target, action, history_buffer)
             total_rewards += reward
             state = next_state
 
@@ -323,15 +323,24 @@ class A3CAgent:
     def _perform_action(self, env, state, target, action, history_buffer):
         if not self._feature_mode:
             # perfrom action and get next frame
-            next_frame, reward, done, _ = env.step(action)
-            next_frame = self.preprocess_frame(next_frame)
-            next_frame_feat = self._tf_sess.run(
-                self._tf_resnet_output, 
-                {self._tf_resnet_input: next_frame[np.newaxis, :, :, :]})
-            next_state = np.concatenate((state[1:, :], next_frame_feat), axis = 0)
+            next_frame, reward, done, success = env.step(action)
+            if success:
+                next_frame = self.preprocess_frame(next_frame)
+                next_frame_feat = self._tf_sess.run(
+                    self._tf_resnet_output, 
+                    {self._tf_resnet_input: next_frame[np.newaxis, :, :, :]})
+                next_state = np.concatenate((state[1:, :], next_frame_feat), axis = 0)
+            else:
+                next_state = state
         else:
             # perfrom action, get next frame idx, and retrieve the feature from table
-            next_feature, reward, done, _ = env.step(action)
+            next_feature, reward, done, success = env.step(action)
+            """
+            if success:
+                next_state = np.concatenate((state[1:, :], next_feature[np.newaxis, :]),axis = 0)
+            else:
+                next_state = state
+            """
             next_state = np.concatenate((state[1:, :], next_feature[np.newaxis, :]),axis = 0)
         # get the value of the current state
         #value = self._tf_sess.run( value_op, feed_dict = {state_op: state})[0]
@@ -358,7 +367,7 @@ class A3CAgent:
                                     {self._tf_resnet_input: self.preprocess_frame(env._target_img)[np.newaxis, :, :, :]})
             target = np.tile(target, (A3CConfig.num_history_frames, 1))
         else:
-            state_feature = env.reset(0, np.random.choice([44, 75, 98, 59, 91]))
+            state_feature = env.reset(0, 59)#np.random.choice([44, 75, 98, 59, 91]))
             state = np.tile(state_feature[np.newaxis, :], (A3CConfig.num_history_frames, 1))
             target_feature = env.get_target_feat()
             target = np.tile(target_feature[np.newaxis, :], (A3CConfig.num_history_frames, 1))

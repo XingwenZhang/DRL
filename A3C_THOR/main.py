@@ -1,8 +1,8 @@
 import argparse
 
 import sys
-sys.path.append('../')
-from THOR import *
+sys.path.append('../THOR')
+from THOREnv import THOREnvironment
 from A3CAgent import A3CAgent
 
 if __name__ == '__main__':
@@ -25,6 +25,10 @@ if __name__ == '__main__':
                         help='whether or not to use extrated feature (default to True)')
     args = parser.parse_args()
 
+    is_test_mode = (args.mode == 'test')
+    THOREnvironment.pre_load(feat_mode=True, load_img_force=is_test_mode)
+    env = THOREnvironment(feat_mode=True)
+
     if args.mode == 'train':
         agent = A3CAgent(num_threads = args.num_threads,
                          model_save_frequency=args.model_save_freq, model_save_path=args.model_save_path,
@@ -33,10 +37,11 @@ if __name__ == '__main__':
         agent.learn(check_point = args.check_point, use_gpu=args.use_gpu, gpu_id=args.gpu_id)
     else:
         # disable frame skipping during testing result in better performance (because the agent can take more actions)
-        env = ACEnvironment(environment_name=args.gym_environment, display=args.display, frame_skipping=False)
-        agent = ACAgent(env)
         assert(args.check_point is not None)
-        agent.test(model_save_path = args.model_save_path, check_point=args.check_point,
-                   use_gpu=args.use_gpu, gpu_id=args.gpu_id)
+        agent = A3CAgent(num_threads = 1,
+                         model_save_frequency=args.model_save_freq, model_save_path=args.model_save_path,
+                         check_point=args.check_point, feature_mode = args.feature_mode,
+                         use_gpu=args.use_gpu, gpu_id=args.gpu_id)
+        agent.test(model_save_path = args.model_save_path)
 
     print('finished.')
