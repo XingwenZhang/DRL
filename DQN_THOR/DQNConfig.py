@@ -10,7 +10,7 @@ max_iterations = 5000000
 discounted_factor = 0.99
 
 # learning rate
-lr = 0.00025
+lr = 0.0005
 
 # epsilon greedy exploration
 initial_exploration = 1

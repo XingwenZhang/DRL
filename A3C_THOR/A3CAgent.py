@@ -40,27 +40,33 @@ class A3CAgent:
         self._num_actions = len(THORConfig.supported_actions)
         self._episode_reward_buffer = deque(maxlen=100)
         self._episode_step_buffer = deque(maxlen=100)
+        for _ in xrange(100):
+            self._episode_reward_buffer.append(-30)
+            self._episode_step_buffer.append(4000)
 
         #self._replay_memory = PGUtil.ExperienceReplayMemory(A3CConfig.replay_memory)
         #self._histroy_frames = PGUtil.FrameHistoryBuffer(A3CConfig.frame_size, A3CConfig.num_history_frames)
         self._tf_sess = None
         self._iter_idx = 0
+        self._num_frames = 0
 
         # tensors
         self._tf_resnet_input = None
         self._tf_resnet_output = None
         self._tf_global_step = None
+        self._tf_num_frames = None
         self._tf_acn_state = None
         self._tf_acn_target = None
         self._tf_acn_image_feature = None
         self._tf_acn_action = None
         self._tf_acn_q_value = None
+        self._tf_acn_advantage = None
         self._tf_acn_sence = None
         self._tf_acn_policy_logit_list = None
         self._tf_acn_state_value_list = None
 
         # ops
-        self._tf_acn_train_op = None
+        self._tf_acn_train_ops = None
         self._tf_action_samplers = None
 
         # variables
@@ -168,6 +174,7 @@ class A3CAgent:
                 #if reward != 0: # Pong has either +1 or -1 reward exactly when game ends.
                 #    print (('ep %d: game finished, reward: %f' % (episode_idx + 1, reward)) + ('' if reward == -1 else ' !!!!!!!!'))
                 total_steps += 1
+                self._num_frames += 1
                 if done:
                     break
 
@@ -175,23 +182,25 @@ class A3CAgent:
                 self._tf_acn_state_value_list[env._env_idx],
                 feed_dict = {self._tf_acn_state: state, 
                              self._tf_acn_target: target})[0]
+            
 
 
             # update models
             states = history_buffer._state_buffer
             actions = history_buffer._action_buffer
-            q_values = history_buffer.compute_q_value(value)
+            q_values, advantage = history_buffer.compute_q_value_and_advantage(value)
             scene_one_hot = np.zeros((q_values.shape[0], self._num_scenes), dtype = np.float32)
             scene_one_hot[:, env._env_idx] = 1
 
 
             _, _, _, summary = \
-            self._tf_sess.run([self._tf_acn_train_op, self._tf_average_reward, self._tf_average_step, self._tf_summary_op],
-                            feed_dict={ self._tf_global_step   : self._iter_idx,
+            self._tf_sess.run([self._tf_acn_train_ops[env._env_idx], self._tf_average_reward, self._tf_average_step, self._tf_summary_op],
+                            feed_dict={ self._tf_num_frames    : self._num_frames,
                                         self._tf_acn_state     : states,
                                         self._tf_acn_target    : np.tile(target, (len(actions), 1)),
                                         self._tf_acn_action    : actions,
                                         self._tf_acn_q_value   : q_values,
+                                        self._tf_acn_advantage : advantage,
                                         self._tf_acn_sence     : scene_one_hot,
                                         self._tf_reward_history: self._episode_reward_buffer,
                                         self._tf_step_history  : self._episode_step_buffer
@@ -216,11 +225,11 @@ class A3CAgent:
                 print "Env id: ", env._env_idx, "Target idx: ", env._target_idx
 
             # record summary
-            self._summary_writer.add_summary(summary, global_step = self._iter_idx)
+            self._summary_writer.add_summary(summary, global_step = self._num_frames)
             self._iter_idx += 1
             if self._iter_idx % self._model_save_freq == 0 or self._iter_idx == A3CConfig.max_iterations:
                 print("Model saved after {} iterations".format(self._iter_idx))
-                self.save(self._model_save_path, global_step = self._iter_idx)
+                self.save(self._model_save_path, global_step = self._num_frames)
 
 
     def test(self, check_point, use_gpu, gpu_id=None):
@@ -264,9 +273,9 @@ class A3CAgent:
         
         placeholders, ops, variables = THORNet.build_actor_critic_network(scope, self._num_actions, self._num_scenes)
         if scope == 'global':
-            self._tf_global_step, self._tf_acn_state, self._tf_acn_target, self._tf_acn_action, self._tf_acn_q_value, \
+            self._tf_num_frames, self._tf_acn_state, self._tf_acn_target, self._tf_acn_action, self._tf_acn_q_value, self._tf_acn_advantage,\
             self._tf_acn_sence, self._tf_reward_history, self._tf_step_history = placeholders
-            self._tf_acn_train_op, self._tf_action_samplers = ops
+            self._tf_acn_train_ops, self._tf_action_samplers = ops
             self._tf_acn_policy_logit_list, self._tf_acn_state_value_list, self._tf_average_reward, self._tf_average_step = variables
         return placeholders, ops, variables
 
@@ -314,7 +323,7 @@ class A3CAgent:
     def _perform_action(self, env, state, target, action, history_buffer):
         if not self._feature_mode:
             # perfrom action and get next frame
-            next_frame, _, reward, done = env.step(action)
+            next_frame, reward, done, _ = env.step(action)
             next_frame = self.preprocess_frame(next_frame)
             next_frame_feat = self._tf_sess.run(
                 self._tf_resnet_output, 
@@ -322,7 +331,7 @@ class A3CAgent:
             next_state = np.concatenate((state[1:, :], next_frame_feat), axis = 0)
         else:
             # perfrom action, get next frame idx, and retrieve the feature from table
-            next_feature, _, reward, done = env.step(action)
+            next_feature, reward, done, _ = env.step(action)
             next_state = np.concatenate((state[1:, :], next_feature[np.newaxis, :]),axis = 0)
         # get the value of the current state
         #value = self._tf_sess.run( value_op, feed_dict = {state_op: state})[0]
@@ -349,7 +358,7 @@ class A3CAgent:
                                     {self._tf_resnet_input: self.preprocess_frame(env._target_img)[np.newaxis, :, :, :]})
             target = np.tile(target, (A3CConfig.num_history_frames, 1))
         else:
-            state_feature = env.reset_random()
+            state_feature = env.reset(0, np.random.choice([44, 75, 98, 59, 91]))
             state = np.tile(state_feature[np.newaxis, :], (A3CConfig.num_history_frames, 1))
             target_feature = env.get_target_feat()
             target = np.tile(target_feature[np.newaxis, :], (A3CConfig.num_history_frames, 1))
