@@ -18,18 +18,20 @@ def extract_image_feature(img_db, net, img_transformer):
     feat_db = FeatureDB()
     for i in xrange(img_db.get_size()):
         print('extracting feature from image {0}/{1}'.format(i, img_db.get_size()))
-        img = img_db.get_img(i)
+        img = img_db.get_img(i) * 255
+        #print img
         net.blobs['data'].data[...] = img_transformer.preprocess('data', img)
         net.forward(end = feature_layer_name)
         feat = net.blobs[feature_layer_name].data.mean(0).mean(1).mean(1)
         feat_db.register_feat(feat)
+        #print feat
     feat_db.optimize_memory_layout()
     return feat_db
 
 if __name__ == '__main__':
 
     # load caffe models
-    resnet_root = '../deep-residual-networks'
+    resnet_root = '../../deep-residual-networks'
     caffe.set_mode_gpu()
     model_def = resnet_root + '/pretrain_models/ResNet-50-deploy.prototxt'
     model_weights = resnet_root + '/pretrain_models/ResNet-50-model.caffemodel'
