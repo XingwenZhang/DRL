@@ -41,9 +41,6 @@ class THOREnvironment:
         if self._step_count == config.episode_max_steps:
             self._done = True
         self._total_episode_reward += reward
-        if config.display:
-            if not self._feat_mode:
-                self.render(observation, 'cur_frame')
         return observation, reward, self._done, action_success
 
     def reset(self, env_idx, target_idx):
@@ -63,15 +60,7 @@ class THOREnvironment:
         self._total_episode_reward = 0
         self._step_count = 0
         self._done = False
-        if config.display:
-            self.render(self._target_img, 'target')
-            if not self._feat_mode:
-                self.render(observation, 'cur_frame')
         return observation
-
-    def render(self, frame, name):
-        env_name = config.supported_envs[self._env_idx]
-        cv2.imshow(name, frame)
 
     def reset_random(self):
         target_idx = random.randrange(0, self.get_num_targets())
@@ -116,8 +105,8 @@ class THOREnvironment:
         return dist
 
     @staticmethod
-    def pre_load(feat_mode):
-        EnvSim.pre_load(feat_mode)
+    def pre_load(feat_mode, load_img_force=False):
+        EnvSim.pre_load(feat_mode, load_img_force)
 
     def _check_found_target(self, observation):
         assert(self._target_img_pose is not None)

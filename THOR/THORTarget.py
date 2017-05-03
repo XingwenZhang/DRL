@@ -16,8 +16,8 @@ class THORTargetManager:
 		self.target_images_folder = target_images_folder
 		self.feat_dbs = None
 		if enable_feat_load:
-			self.feat_dbs = THORTargetManager._load_feature_db()
-			self.pose_to_view_idx = THORTargetManager._load_pose_to_view_idx()
+			self.feat_dbs = THORTargetManager._get_feature_db()
+			self.pose_to_view_idx = THORTargetManager._get_pose_to_view_idx()
 
 	def get_target_image(self, env_name, target_idx):
 		folder = os.path.join(self.target_images_folder, env_name)
@@ -78,13 +78,9 @@ class THORTargetManager:
 			pickle.dump(target_images_poses[i], open(os.path.join(dump_folder, str(i) + '.pose'), 'wb'))
 
 	@staticmethod
-	def _load_feature_db():
-		env = EnvSim(feat_mode=True)
-		env.pre_load()
+	def _get_feature_db():
 		return EnvSim.get_feat_dbs()
 
 	@staticmethod
-	def _load_pose_to_view_idx():
-		env = EnvSim(feat_mode=True)
-		env.pre_load()
+	def _get_pose_to_view_idx():
 		return EnvSim.get_pose_to_idx()

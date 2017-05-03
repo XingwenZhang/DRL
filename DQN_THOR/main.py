@@ -29,9 +29,9 @@ if __name__ == '__main__':
                         help='whether to render to result. (default to False)')
     args = parser.parse_args()
 
-    feat_mode = True
-    THOREnvironment.pre_load(feat_mode=feat_mode)
-    env = THOREnvironment(feat_mode=feat_mode)
+    is_test_mode = (args.mode == 'test')
+    THOREnvironment.pre_load(feat_mode=True, load_img_force=is_test_mode)
+    env = THOREnvironment(feat_mode=True)
     agent = DQNAgent(env)
 
     if args.mode == 'train':

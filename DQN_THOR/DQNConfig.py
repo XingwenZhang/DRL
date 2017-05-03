@@ -17,7 +17,7 @@ initial_exploration = 1
 final_exploration = 0.1
 final_exploration_frame = 1000000
 exploration_change_rate = (final_exploration - initial_exploration)/final_exploration_frame
-test_exploration = 0.
+test_exploration = 0.1
 
 # random start during training 
 random_start = 30
@@ -59,4 +59,4 @@ prioritized_experience_replay_beta = 0.5
 
 # debug options
 fix_target_image = True
-fix_target_image_idx = 10
+fix_target_image_idx = 59

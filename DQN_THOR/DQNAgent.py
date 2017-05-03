@@ -64,7 +64,7 @@ class DQNAgent:
             self.load(model_load_path)
 
         # start new episode
-        self._request_new_episode(random_start=True)
+        self._request_new_episode()
 
         # first take some random actions to populate the replay memory before learning starts
         if model_load_path is None:
@@ -74,7 +74,7 @@ class DQNAgent:
                     print('{0}/{1}'.format(i, config.replay_start_size))
                 done = self._perform_random_action()
                 if done:
-                    self._request_new_episode(random_start=True)
+                    self._request_new_episode()
 
         print('Training started, please open Tensorboard to monitor the training process.')
         episode_count=0
@@ -107,7 +107,7 @@ class DQNAgent:
                 summary_episode_steps = self._tf_sess.run(self._tf_summary_episode_steps, feed_dict={self._tf_episode_steps: episode_steps})
                 summary_writer.add_summary(summary_episode_steps, global_step=episode_count)
                 episode_count += 1
-                self._request_new_episode(random_start=True)
+                self._request_new_episode()
 
 
             # sample mini-batch and perform training
@@ -166,11 +166,13 @@ class DQNAgent:
             # select and perform action
             state = self._get_current_state()
             state = state[np.newaxis]
-            Q = self._evaluate_q(state, self._cur_target)
+            target = self._cur_target[np.newaxis]
+            Q = self._evaluate_q(state, target)
             a = self._select_action(Q, i, test_mode=True)
             self._perform_action(a)
             if self._env.episode_done():
-                print('total_reward received: {0}'.format(self._env.get_total_reward()))
+                print('total_reward received: {0}'.format(self._env.get_total_episode_reward()))
+                print('total_steps: {0}'.format(self._env.get_steps_count()))
                 self._request_new_episode()
 
     def _init_dqn(self, dueling_dqn):
@@ -221,7 +223,7 @@ class DQNAgent:
             self._replay_memory.add(self._cur_target, action, reward, self._cur_observation, done)
         return done
 
-    def _request_new_episode(self, random_start=False):
+    def _request_new_episode(self):
         if config.fix_target_image:
             observation = self._env.reset(0, config.fix_target_image_idx)
         else:

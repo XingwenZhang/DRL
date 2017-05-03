@@ -22,7 +22,7 @@ num_targets = thor_env.get_num_targets()
 print('number of actions: ' + str(num_actions))
 print('number of targets: ' + str(num_targets))
 
-thor_env.reset_random()
+thor_env.reset(0,59)
 
 print('cur_env_idx: ' + str(thor_env.get_env_idx()))
 print('cur_env_name: ' + thor_env.get_env_name())
