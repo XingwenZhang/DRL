@@ -4,7 +4,7 @@ import os
 assert 'THOR_HOME' in os.environ, 'please first set env_var THOR_HOME as the absolute path of DRL/THOR'
 
 # open display
-display = True
+display = False
 
 # size of the input image to the network
 net_input_width=224
