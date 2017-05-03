@@ -10,7 +10,7 @@ max_iterations = 5000000
 discounted_factor = 0.99
 
 # learning rate
-lr = 0.00025
+lr = 0.0005
 
 # epsilon greedy exploration
 initial_exploration = 1
@@ -59,4 +59,4 @@ prioritized_experience_replay_beta = 0.5
 
 # debug options
 fix_target_image = True
-fix_target_image_idx = 10
+fix_target_image_idx = 59

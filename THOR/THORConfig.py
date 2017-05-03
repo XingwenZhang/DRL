@@ -4,7 +4,7 @@ import os
 assert 'THOR_HOME' in os.environ, 'please first set env_var THOR_HOME as the absolute path of DRL/THOR'
 
 # open display
-display = False
+display = True
 
 # size of the input image to the network
 net_input_width=224
@@ -58,7 +58,7 @@ reward_notfound = -0.01
 reward_found = 10.0
 reward_notfound_notsuccess = -0.015	# don't hit the wall, it hurts
 use_distance_reward = False
-distance_decrease_reward = 0.005	# if distance decreases, you receive additional reward
+distance_decrease_reward = 0.001	# if distance decreases, you receive additional reward
 
 # debug options:
 diable_random_start = True
