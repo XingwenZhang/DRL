@@ -13,8 +13,8 @@ net_input_height=224
 THOR_HOME = os.environ['THOR_HOME']
 
 # OSX / Linux
-# binary_build = THOR_HOME + '/thor_binary/thor-201705011400-OSXIntel64.app/Contents/MacOS/thor-201705011400-OSXIntel64'
-binary_build = THOR_HOME + '/thor_binary/thor-201705011400-Linux64'
+binary_build = THOR_HOME + '/thor_binary/thor-201705011400-OSXIntel64.app/Contents/MacOS/thor-201705011400-OSXIntel64'
+# binary_build = THOR_HOME + '/thor_binary/thor-201705011400-Linux64'
 
 target_folder = THOR_HOME + '/thor_binary/thor-challenge-targets/targets-train.json'
 linux_build='not supported'
