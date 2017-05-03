@@ -31,7 +31,7 @@ def extract_image_feature(img_db, net, img_transformer):
 if __name__ == '__main__':
 
     # load caffe models
-    resnet_root = '../../deep-residual-networks'
+    resnet_root = '../deep-residual-networks'
     caffe.set_mode_gpu()
     model_def = resnet_root + '/pretrain_models/ResNet-50-deploy.prototxt'
     model_weights = resnet_root + '/pretrain_models/ResNet-50-model.caffemodel'

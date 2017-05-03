@@ -1,3 +1,4 @@
+rm -rf thor_binary
 mkdir -p thor_binary
 cd thor_binary
 
