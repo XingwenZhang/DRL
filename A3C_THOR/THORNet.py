@@ -17,8 +17,8 @@ def build_actor_critic_network(scope, num_action, num_scene):
     with tf.variable_scope(scope):
         # get the nodes of input images and output features
         with tf.name_scope('inputs'):
-            global_step = tf.placeholder(
-                name = 'global_step', 
+            num_frames = tf.placeholder(
+                name = 'num_frames', 
                 shape = None,
                 dtype = tf.int32)
             state_placeholder = tf.placeholder(
@@ -28,14 +28,17 @@ def build_actor_critic_network(scope, num_action, num_scene):
             target_placeholder = tf.placeholder(
                 name = 'target',
                 shape = (None, 2048),
-                dtype = tf.float32
-            )
+                dtype = tf.float32)
             action_placeholder = tf.placeholder(
                 name  = 'taken_action', 
                 shape = (None, ), 
                 dtype = tf.int32)
             q_value_placeholder = tf.placeholder(
                 name  = 'q_value',
+                shape = (None, ),
+                dtype = tf.float32)
+            advantage_placeholder = tf.placeholder(
+                name  = 'advantage',
                 shape = (None, ),
                 dtype = tf.float32)
             scene_placeholder = tf.placeholder(
@@ -64,7 +67,7 @@ def build_actor_critic_network(scope, num_action, num_scene):
         policy_prob_list = []
         state_value_list = []
         for i in xrange(num_scene):
-            with tf.variable_scope("scene_{0}".format(THORConfig.supported_envs[i]), reuse = False):
+            with tf.variable_scope(THORConfig.supported_envs[i], reuse = False):
                 # fc3 shared for policy and value output
                 fc3 = TFUtil.fc_layer('fc_3'.format(i), fc2, input_size=512, num_neron=512, variable_dict=variable_dict)
                 # policy output
@@ -85,14 +88,13 @@ def build_actor_critic_network(scope, num_action, num_scene):
                     name   = 'log_prob',
                     labels = action_placeholder,
                     logits = policy_logits_list[i])
-                advantage = tf.stop_gradient(q_value_placeholder - state_value_list[i])
-                policy_loss = - tf.reduce_sum(log_prob * advantage)
+                policy_loss = - tf.reduce_sum(tf.maximum(log_prob, tf.log(1e-6)) * advantage_placeholder) # regularization for A3C delay
                 policy_entropy = - 0.01 * tf.reduce_sum(policy_prob_list[i] * tf.log(policy_prob_list[i] + 1e-20))
                 # value_loss
-                value_loss = 0.5 * tf.nn.l2_loss(q_value_placeholder - state_value_list[i])
+                value_loss = 0.5 * tf.reduce_sum(tf.square(q_value_placeholder - state_value_list[i]))
                 # need to tweak weight
                 scene_loss.append(policy_loss + value_loss - policy_entropy)
-                with tf.name_scope('secen_summary_%02i' %(i)): 
+                with tf.name_scope('secen_summary_{0}'.format(THORConfig.supported_envs[i])): 
                     tf.summary.scalar('policy_loss', policy_loss)
                     tf.summary.scalar('policy_entropy', policy_entropy)
                     tf.summary.scalar('value_loss', value_loss)
@@ -112,7 +114,9 @@ def build_actor_critic_network(scope, num_action, num_scene):
             # create optizer
             #optimizer = tf.train.AdamOptimizer(learning_rate = A3CConfig.learning_rate)
             optimizer = tf.train.RMSPropOptimizer(learning_rate = A3CConfig.learning_rate)#, momentum = A3CConfig.momentum)
-            train_op = optimizer.minimize(loss)
+            train_ops = []
+            for i in xrange(num_scene):
+                train_ops.append(optimizer.minimize(scene_loss[i]))
 
             """
             local_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope = scope)
@@ -171,8 +175,8 @@ def build_actor_critic_network(scope, num_action, num_scene):
             tf.summary.scalar('average_steps_over_100_episodes', average_step)
             tf.summary.scalar('loss', loss)
 
-        return (global_step, state_placeholder, target_placeholder, action_placeholder, q_value_placeholder, \
+        return (num_frames, state_placeholder, target_placeholder, action_placeholder, q_value_placeholder, advantage_placeholder, \
                 scene_placeholder, reward_history_placeholder, step_history_placeholder), \
-               (train_op, action_sampler_ops), \
+               (train_ops, action_sampler_ops), \
                (policy_logits_list, state_value_list, average_reward, average_step)
 

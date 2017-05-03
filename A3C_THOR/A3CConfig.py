@@ -17,8 +17,8 @@ decay = 0.99
 
 # epsilon greedy exploration
 initial_exploration = 1.0
-final_exploration = 0.0
-final_exploration_frame = 200000
+final_exploration = 0.1
+final_exploration_frame = 50000
 exploration_change_rate = (final_exploration - initial_exploration)/final_exploration_frame
 test_exploration = 0.0
 
