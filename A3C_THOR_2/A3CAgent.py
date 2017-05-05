@@ -103,7 +103,7 @@ class A3CAgent:
                 last_reward = total_rewards
             else:
                 value = self._tf_sess.run(
-                    self._tf_acn_state_value[THORCofig.supported_env[env_idx]],
+                    self._tf_acn_state_value_dict[THORConfig.supported_envs[env_idx]],
                     feed_dict = {self._tf_acn_state: state, 
                                  self._tf_acn_target: target})[0]
             
@@ -113,7 +113,7 @@ class A3CAgent:
             q_values = self._history_buffer.compute_q_value(value)
 
             _ = self._tf_sess.run(
-                self._tf_acn_train_ops[THORConfig.supported_env[env_idx]],
+                self._tf_acn_train_ops[THORConfig.supported_envs[env_idx]],
                 feed_dict={ self._tf_acn_state   : states,
                             self._tf_acn_target  : np.tile(target, (len(actions), 1)),
                             self._tf_acn_action  : actions,
@@ -196,6 +196,10 @@ class A3CAgent:
         
         # create initializer
         var_list = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope = self._scope)
+        #if self._scope == "global":
+        #    for var in var_list:
+        #        print var.name
+        #    exit(1)
         init_op = tf.variables_initializer(var_list)
   
         # initialize or load network variables
@@ -246,13 +250,13 @@ class A3CAgent:
             if test_mode:
                 #action = np.argmax(self._tf_sess.run(, {network_state_op: state})[0])
                 action = np.argmax(self._tf_sess.run(
-                    self._tf_acn_policy_prob_dict[THORConfig.supported_envs[self.env._env_idx]],
+                    self._tf_acn_policy_prob_dict[THORConfig.supported_envs[self._env._env_idx]],
                     {self._tf_acn_state: state,
                      self._tf_acn_target: target})[0])
             else:
                 #action = self._tf_sess.run(sampler_op, {network_state_op: state})[0][0]
                 action_probs = self._tf_sess.run(
-                    self._tf_acn_policy_prob_dict[THORConfig.supported_envs[self.env._env_idx]],
+                    self._tf_acn_policy_prob_dict[THORConfig.supported_envs[self._env._env_idx]],
                     {self._tf_acn_state: state,
                      self._tf_acn_target: target})[0]
                 action = np.random.choice(np.arange(self._num_actions, p = action_probs))
@@ -306,7 +310,7 @@ class A3CAgent:
         else:
             state_feature = self._env.reset(0, np.random.choice([44, 75, 98, 59, 91]))
             state = np.tile(state_feature[np.newaxis, :], (A3CConfig.num_history_frames, 1))
-            target_feature = env.get_target_feat()
+            target_feature = self._env.get_target_feat()
             target = np.tile(target_feature[np.newaxis, :], (A3CConfig.num_history_frames, 1))
         return state, target
 

@@ -27,7 +27,7 @@ class HistoryBuffer:
         self._action_buffer = []
         self._value_buffer = []
     
-    def compute_q_value_and_advantage(self, final_value):
+    def compute_q_value(self, final_value):
         N = len(self._reward_buffer)
         # compute q-values
         q_value = np.zeros(N)
@@ -37,9 +37,9 @@ class HistoryBuffer:
             q_value[t] = value
             value *= self._discount_factor
         
-        advantage = q_value - self._value_buffer
+        #advantage = q_value - self._value_buffer
 
-        return q_value, advantage
+        return q_value#, advantage
 
 class FrameHistoryBuffer:
     """ frame history buffer maintains a fixed number of history frames

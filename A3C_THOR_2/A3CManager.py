@@ -51,7 +51,7 @@ class A3CManager:
                 # create learner threads
                 learner_threads = []
                 for i in xrange(self._num_agents):
-                    local_scope = "agent{0:03d}".format(i)
+                    local_scope = "agent_{0:03d}".format(i)
                     local_agent = A3CAgent(scope = local_scope, feature_mode = self._feature_mode)
                     local_agent._init_network()
                     learner_threads.append(
@@ -60,7 +60,9 @@ class A3CManager:
                             args=(use_gpu, gpu_id)))
                 
                 self._global_agent.create_summary_ops
-
+                #with tf.Session() as sess:
+                #    init = tf.global_variables_initializer()
+                #    sess.run(init)
         for t in learner_threads:
             t.start()
         for t in learner_threads:

@@ -79,7 +79,7 @@ def build_actor_critic_network(scope, num_action, num_scene):
                     name   = 'log_prob',
                     labels = action_placeholder,
                     logits = policy_logits_dict[scene])
-                policy_loss = - tf.reduce_sum(tf.maximum(log_prob, tf.log(1e-6)) * advantage_placeholder) # regularization for A3C delay
+                policy_loss = - tf.reduce_sum(log_prob * tf.stop_gradient(q_value_placeholder - state_value_dict[scene])) # regularization for A3C delay
                 policy_entropy = - 0.01 * tf.reduce_sum(policy_prob_dict[scene] * tf.log(tf.clip_by_value(policy_prob_dict[scene], 1e-20, 1)))
                 # value_loss
                 value_loss = 0.5 * tf.reduce_sum(tf.square(q_value_placeholder - state_value_dict[scene]))
