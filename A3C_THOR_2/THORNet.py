@@ -90,45 +90,45 @@ def build_actor_critic_network(scope, num_action, num_scene):
                     tf.summary.scalar('policy_entropy', policy_entropy)
                     tf.summary.scalar('value_loss', value_loss)
 
-        with tf.name_scope('train_ops'):
-            train_ops = {}
-            # train_op
-            # optional: varying learning_rate
-            """
-            learning_rate = tf.train.exponential_decay(
-                learning_rate = A3CConfig.learning_rate, 
-                global_step   = global_step, 
-                decay_steps   = A3CConfig.decay_step,
-                decay_rate    = A3CConfig.decay_rate)
-            """
-
-            # create optimizer
-            #optimizer = tf.train.AdamOptimizer(learning_rate = A3CConfig.learning_rate)
-            optimizer = tf.train.RMSPropOptimizer(learning_rate = A3CConfig.learning_rate, decay = A3CConfig.decay_rate, epsilon = 0.1)#, momentum = A3CConfig.momentum)
+    with tf.name_scope('train_ops'):
+        train_ops = {}
+        # train_op
+        # optional: varying learning_rate
+        """
+        learning_rate = tf.train.exponential_decay(
+            learning_rate = A3CConfig.learning_rate, 
+            global_step   = global_step, 
+            decay_steps   = A3CConfig.decay_step,
+            decay_rate    = A3CConfig.decay_rate)
+        """
+        
+        # create optimizer
+        #optimizer = tf.train.AdamOptimizer(learning_rate = A3CConfig.learning_rate)
+        optimizer = tf.train.RMSPropOptimizer(learning_rate = A3CConfig.learning_rate, decay = A3CConfig.decay_rate, epsilon = 0.1)#, momentum = A3CConfig.momentum)
+        
+        for scene in THORConfig.supported_envs:
+            # get local trainable variables and compute gradients
+            local_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope = scope)
+            grad_var = optimizer.compute_gradients(scene_losses[scene], var_list = local_vars)
             
-            for scene in THORConfig.supported_envs:
-                # get local trainable variables and compute gradients
-                local_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope = scope)
-                grad_var = optimizer.compute_gradients(scene_losses[scene], var_list = local_vars)
-                
-                # optional: gradient clipping
-                clipped_grad_var = []
-                for grad, var in grad_var:
-                    if grad is not None:
-                        clipped_grad_var.append((tf.clip_by_norm(grad, 40.), var))
-                    else:
-                        clipped_grad_var.append((None, var))
-                grad_var = clipped_grad_var
-                
-                # apply gradient to global variables
-                if scope != 'global':
-                    global_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope = 'global')
-                    tmp = []
-                    for i in xrange(len(grad_var)):
-                        tmp.append((grad_var[i][0], global_vars[i]))
-                    grad_var = tmp
-                        
-                train_ops[scene] = optimizer.apply_gradients(grad_var)
+            # optional: gradient clipping
+            clipped_grad_var = []
+            for grad, var in grad_var:
+                if grad is not None:
+                    clipped_grad_var.append((tf.clip_by_norm(grad, 40.), var))
+                else:
+                    clipped_grad_var.append((None, var))
+            grad_var = clipped_grad_var
+            
+            # apply gradient to global variables
+            if scope != 'global':
+                global_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope = 'global')
+                tmp = []
+                for i in xrange(len(grad_var)):
+                    tmp.append((grad_var[i][0], global_vars[i]))
+                grad_var = tmp
+                    
+            train_ops[scene] = optimizer.apply_gradients(grad_var)
     
     # get summary ops
     with tf.variable_scope('global', reuse = (scope != "global")):
