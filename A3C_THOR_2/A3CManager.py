@@ -43,41 +43,49 @@ class A3CManager:
         device_str = TFUtil.get_device_str(use_gpu=use_gpu, gpu_id=gpu_id)
         with tf.Graph().as_default():
             with tf.device(device_str):
-                # initialize a global agent
-                self._global_agent = A3CAgent(scope = "global", feature_mode = self._feature_mode)
-                self._global_agent._init_network(check_point = check_point) 
-                            
-                # start training
-                # create learner threads
-                learner_threads = []
-                for i in xrange(self._num_agents):
-                    local_scope = "agent_{0:03d}".format(i)
-                    local_agent = A3CAgent(scope = local_scope, feature_mode = self._feature_mode)
-                    local_agent._init_network()
+                config = tf.ConfigProto(allow_soft_placement=True, log_device_placement=True)
+                config.gpu_options.allow_growth = True
+                with tf.Session(config=config) as sess:
+                    # initialize a global agent
+                    self._global_agent = A3CAgent(sess = sess, scope = "global", feature_mode = self._feature_mode)
+                    self._global_agent._init_network(check_point = check_point) 
+                    self._global_agent.create_global_summary_ops()
+                                
+                    # start training
+                    # create learner threads
+                    learner_threads = []
+                    for i in xrange(self._num_agents):
+                        local_scope = "agent_{0:03d}".format(i)
+                        local_agent = A3CAgent(sess = sess, scope = local_scope, feature_mode = self._feature_mode)
+                        local_agent._init_network()
+                        learner_threads.append(
+                            threading.Thread(
+                                target=local_agent.learn,
+                                args=(use_gpu, gpu_id)))
+                    
+                    # initilize all variables
+                    sess.run(tf.global_variables_initializer())
+                    # load resnet variables
+                    A3CAgent.tf_resnet_saver.restore(sess, A3CConfig.resnet_pretrain_model)
+
+                    # initialize or load network variables
+                    if check_point:
+                        self._global_agent.load(self._model_save_path, check_point) 
+                        A3CConfig.num_frames = check_point
+                    else:
+                        A3CConfig.num_frames = 0
+                    
                     learner_threads.append(
                         threading.Thread(
-                            target=local_agent.learn,
-                            args=(use_gpu, gpu_id)))
-                
-                self._global_agent.create_summary_ops
-                #with tf.Session() as sess:
-                #    init = tf.global_variables_initializer()
-                #    sess.run(init)
-        for t in learner_threads:
-            t.start()
-        for t in learner_threads:
-            t.join()
+                            target=self._global_agent.save_model_monitor,
+                            args=(A3CConfig.num_frames, self._model_save_path, self._model_save_interval)))
+                    print('Training started, please open Tensorboard to monitor the training process.')
+                    for t in learner_threads:
+                        t.start()
+                    for t in learner_threads:
+                        t.join()
 
-        print('Training started, please open Tensorboard to monitor the training process.')
-        # Show the agents training and write summary statistics
-        
-        last_save_frame = 0
-        cur_frame = 0
-        while cur_frame <= A3CConfig.max_iterations:
-            cur_frame = A3CAgent.num_frames
-            if cur_frame - last_save_frame > self._model_save_interval or cur_frame >= A3CConfig.max_iterations:
-                print("Model saved after {} frames".format(cur_frame))
-                self._global_agent.save(self._model_save_path, global_step = cur_frame)
+    
 
 
     def test(self, check_point, use_gpu, gpu_id=None):

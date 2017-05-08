@@ -17,8 +17,8 @@ if __name__ == '__main__':
                         help='path to save/load the model for training/testing (default to models/a3c_model.ckpt)')
     parser.add_argument('--check_point', type=int, default=None,
                         help='index of the ckeck point (default to None)')
-    parser.add_argument('--model_save_interval', type=int, default=50000,
-                        help='dump model at every k-th iteration (default to 50000)')
+    parser.add_argument('--model_save_interval', type=int, default=500000,
+                        help='dump model at every k-th iteration (default to 500000)')
     parser.add_argument('--num_agents', type=int, default=4,
                         help='number of agents to use in A3C algorithm (default to 4)')
     parser.add_argument('--feature_mode', type=bool, default=True,

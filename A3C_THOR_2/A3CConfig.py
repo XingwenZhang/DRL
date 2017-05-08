@@ -7,9 +7,10 @@ max_iterations = 10000000
 discounted_factor = 0.99
 
 # learning rate
-learning_rate = 1e-5
+learning_rate = 1e-2
+end_learning_rate = 1e-4
 decay_rate = 0.99
-decay_step = 100000
+decay_step = 10000000
 momentum = 0.8
 
 # decay
@@ -17,13 +18,13 @@ decay = 0.99
 
 # epsilon greedy exploration
 initial_exploration = 1.0
-final_exploration = 0.1
+final_exploration = 0.2
 final_exploration_frame = 200000
 exploration_change_rate = (final_exploration - initial_exploration)/final_exploration_frame
 test_exploration = 0.0
 
 # max_step, max number of step
-max_steps = 50
+max_steps = 10
 
 # batch_size
 batch_size = 1

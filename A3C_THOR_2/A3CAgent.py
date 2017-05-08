@@ -25,12 +25,14 @@ class A3CAgent:
     num_episodes = 0
     tf_resnet_input = None
     tf_resnet_output = None
+    tf_resnet_saver = None
     # summary ops
-    tf_summary_op = None
+    tf_global_summary_op = None
     tf_summary_writer = None
+    episode_step_buffer = deque(maxlen = 100)
+    episode_reward_buffer = deque(maxlen = 100)
 
-
-    def __init__(self, scope, feature_mode = False):
+    def __init__(self, sess, scope, feature_mode = False):
         # scope name
         self._scope = scope
         self._env = None
@@ -47,7 +49,7 @@ class A3CAgent:
         
         #self._replay_memory = PGUtil.ExperienceReplayMemory(A3CConfig.replay_memory)
         #self._histroy_frames = PGUtil.FrameHistoryBuffer(A3CConfig.frame_size, A3CConfig.num_history_frames)
-        self._tf_sess = None
+        self._tf_sess = sess
         self._iter_idx = 0
         self._num_frames = 0
 
@@ -62,15 +64,15 @@ class A3CAgent:
         
         # ops
         self._tf_acn_train_ops = None
+        self._tf_acn_summary_op = None
 
         # saver
         self._saver = None
 
+
     def learn(self, use_gpu, gpu_id=None):
         self._env = THOREnvironment(feat_mode = self._feature_mode)
         done = True
-        last_episode_steps = np.nan
-        last_reward = np.nan
         while A3CAgent.num_episodes < A3CConfig.max_iterations:
             # if this is not global agent, copy parameters from global agent
             if self._scope != "global":
@@ -78,6 +80,7 @@ class A3CAgent:
 
             # if episode is done, request new episode
             if done:
+                A3CAgent.num_episodes += 1
                 state, target = self._request_new_episode()
                 env_idx = self._env._env_idx; target_idx = self._env._target_idx
                 print "Episode: {0}, Env: {1}, Target idx: {2}".format(A3CAgent.num_episodes, THORConfig.supported_envs[env_idx], target_idx)
@@ -99,8 +102,6 @@ class A3CAgent:
 
             if done: 
                 value = 0
-                last_episode_steps = total_steps
-                last_reward = total_rewards
             else:
                 value = self._tf_sess.run(
                     self._tf_acn_state_value_dict[THORConfig.supported_envs[env_idx]],
@@ -111,34 +112,44 @@ class A3CAgent:
             states = self._history_buffer._state_buffer
             actions = self._history_buffer._action_buffer
             q_values = self._history_buffer.compute_q_value(value)
-
-            _ = self._tf_sess.run(
-                self._tf_acn_train_ops[THORConfig.supported_envs[env_idx]],
-                feed_dict={ self._tf_acn_state   : states,
+            _, summary = self._tf_sess.run(
+                [self._tf_acn_train_ops[THORConfig.supported_envs[env_idx]], self._tf_acn_summary_op],
+                feed_dict={ self._tf_global_step : A3CAgent.num_frames,
+                            self._tf_acn_state   : states,
                             self._tf_acn_target  : np.tile(target, (len(actions), 1)),
                             self._tf_acn_action  : actions,
                             self._tf_acn_q_value : q_values})
+
+            A3CAgent.tf_summary_writer.add_summary(summary, global_step = A3CAgent.num_frames)
 
             self._history_buffer.clean_up()
 
             # reset environment if done
             if done:
                 # save number of steps
-                self._episode_step_buffer.append(total_steps)
+                A3CAgent.episode_step_buffer.append(total_steps)
                 print("Number of steps for this episode: {}".format(total_steps))
-                print("Average number of steps for last 100 episodes: {}".format(np.mean(self._episode_step_buffer)))
+                print("Average number of steps for last 100 episodes: {}".format(np.mean(A3CAgent.episode_step_buffer)))
                 # save episode reward
-                self._episode_reward_buffer.append(total_rewards)
+                A3CAgent.episode_reward_buffer.append(total_rewards)
                 print("Reward for this episode: {}".format(total_rewards))
-                print("Average reward for last 100 episodes: {}".format(np.mean(self._episode_reward_buffer)))
-                # record summary
+                print("Average reward for last 100 episodes: {}".format(np.mean(A3CAgent.episode_reward_buffer)))
                 summary = self._tf_sess.run(
-                    A3CAgent.tf_summary_opsummary, 
-                    feed_dict = {
-                            self._tf_num_step : total_steps,
-                            self._tf_reward: totol_reward})
+                    A3CAgent.tf_global_summary_op,
+                    feed_dict={ self._tf_num_steps   : [A3CAgent.episode_step_buffer[-1]], 
+                                self._tf_reward      : [A3CAgent.episode_reward_buffer[-1]]})
+
                 A3CAgent.tf_summary_writer.add_summary(summary, global_step = A3CAgent.num_frames)
-                A3CAgent.num_episodes += 1
+
+    def save_model_monitor (self, last_save_frame, model_save_path, model_save_interval):
+        assert(self._scope == "global")
+        cur_frame = 0
+        while cur_frame < A3CConfig.max_iterations:
+            cur_frame = A3CAgent.num_frames
+            if cur_frame - last_save_frame > model_save_interval:
+                print("Model saved after {} frames".format(cur_frame))
+                self.save(model_save_path, global_step = cur_frame)
+                last_save_frame = cur_frame
 
 
     def test(self, check_point, use_gpu, gpu_id=None):
@@ -175,27 +186,27 @@ class A3CAgent:
 
     def _init_network(self, check_point = None):
         # build a3c network
-        config = tf.ConfigProto(allow_soft_placement=True, log_device_placement=True)
-        config.gpu_options.allow_growth = True
-        self._tf_sess = tf.Session(config=config)
 
         # load shared resnet input
         if self._scope == 'global':
-            saver = tf.train.import_meta_graph(A3CConfig.resnet_meta_graph)
-            saver.restore(self._tf_sess, A3CConfig.resnet_pretrain_model)
+            A3CAgent.tf_resnet_saver = tf.train.import_meta_graph(A3CConfig.resnet_meta_graph)
             graph = tf.get_default_graph()
             A3CAgent.tf_resnet_input = graph.get_tensor_by_name("images:0") 
             A3CAgent.tf_resnet_output = graph.get_tensor_by_name("avg_pool:0")
+            
         
         # build network
         placeholders, dicts, ops, variables = THORNet.build_actor_critic_network(self._scope, self._num_actions, self._supported_scens)
-        self._tf_acn_state, self._tf_acn_target, self._tf_acn_action, self._tf_acn_q_value = placeholders
+        self._tf_global_step, self._tf_acn_state, self._tf_acn_target, self._tf_acn_action, self._tf_acn_q_value = placeholders
         self._tf_acn_policy_prob_dict, self._tf_acn_state_value_dict = dicts
-        self._tf_acn_train_ops = ops[0]
+        self._tf_acn_train_ops, self._tf_acn_summary_op = ops
         self._tf_reward, self._tf_num_steps = variables
         
         # create initializer
         var_list = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope = self._scope)
+        if self._scope == "global":
+            self._saver = tf.train.Saver(var_list = var_list)
+        """
         #if self._scope == "global":
         #    for var in var_list:
         #        print var.name
@@ -214,10 +225,36 @@ class A3CAgent:
                 A3CConfig.num_frames = check_point
         else:
             self._tf_sess.run(init_op)
+        """
     
-    def create_summary_ops():
-        assert(scope == "global")
-        A3CAgent.tf_summary_op = tf.summary.merge_all()
+    def create_global_summary_ops(self):
+        assert(self._scope == "global")
+        # get summary ops
+        global_summaries = []
+        with tf.variable_scope('global', reuse = True):
+            fc1_weight = tf.get_local_variable(
+                name = 'shared_layers/fc1/fc_weights')
+            fc1_bias = tf.get_variable(
+                name = 'shared_layers/fc1/fc_bias')
+            fc2_weight = tf.get_local_variable(
+                name = 'shared_layers/fc2/fc_weights')
+            fc2_bias = tf.get_variable(
+                name = 'shared_layers/fc2/fc_bias')
+            fc3_weight = tf.get_local_variable(
+                name = 'env_t1/fc3/fc_weights')
+            fc3_bias = tf.get_variable(
+                name = 'env_t1/fc3/fc_bias')
+            
+        with tf.name_scope("global_summary"):
+            global_summaries.append(tf.summary.scalar('reward', tf.reduce_mean(self._tf_reward)))
+            global_summaries.append(tf.summary.scalar('num_step', tf.reduce_mean(self._tf_num_steps)))
+            global_summaries.append(tf.summary.histogram('fc1_weight', fc1_weight))
+            global_summaries.append(tf.summary.histogram('fc1_bias', fc1_bias))
+            global_summaries.append(tf.summary.histogram('fc2_weight', fc2_weight))
+            global_summaries.append(tf.summary.histogram('fc2_bias', fc2_bias))
+            global_summaries.append(tf.summary.histogram('fc3_weight', fc3_weight))
+            global_summaries.append(tf.summary.histogram('fc3_bias', fc3_bias))
+        A3CAgent.tf_global_summary_op = tf.summary.merge(global_summaries)
         A3CAgent.tf_summary_writer = tf.summary.FileWriter(A3CConfig.summary_folder, self._tf_sess.graph)
 
     def _evaluate_q(self, state):
@@ -259,7 +296,7 @@ class A3CAgent:
                     self._tf_acn_policy_prob_dict[THORConfig.supported_envs[self._env._env_idx]],
                     {self._tf_acn_state: state,
                      self._tf_acn_target: target})[0]
-                action = np.random.choice(np.arange(self._num_actions, p = action_probs))
+                action = np.random.choice(np.arange(self._num_actions), p = action_probs)
         return action
 
     def _perform_action(self, state, target, action):
@@ -308,7 +345,7 @@ class A3CAgent:
                                     {self._tf_resnet_input: self.preprocess_frame(env._target_img)[np.newaxis, :, :, :]})
             target = np.tile(target, (A3CConfig.num_history_frames, 1))
         else:
-            state_feature = self._env.reset(0, np.random.choice([44, 75, 98, 59, 91]))
+            state_feature = self._env.reset(0, 59)#np.random.choice([44, 75, 98, 59, 91, 2, 35, 46, 65, 78]))
             state = np.tile(state_feature[np.newaxis, :], (A3CConfig.num_history_frames, 1))
             target_feature = self._env.get_target_feat()
             target = np.tile(target_feature[np.newaxis, :], (A3CConfig.num_history_frames, 1))

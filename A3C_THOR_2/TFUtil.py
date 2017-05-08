@@ -17,7 +17,7 @@ def conv_layer(name, input, shape, stride, activation=tf.nn.relu, variable_dict=
 def fc_layer(name, input, input_size, num_neron, activation=tf.nn.relu, variable_dict=None):
     with tf.variable_scope(name):
         weights = tf.get_variable('fc_weights', shape=[input_size, num_neron], initializer=tf.contrib.layers.xavier_initializer())
-        bias = tf.get_variable('fc_bias', shape=[num_neron], initializer=tf.constant_initializer(0.0))
+        bias = tf.get_variable('fc_bias', shape=[num_neron,], initializer=tf.constant_initializer(0.0))
         if variable_dict is not None:
             variable_dict[name + '/fc_weights'] = weights
             variable_dict[name + '/fc_bias'] = bias

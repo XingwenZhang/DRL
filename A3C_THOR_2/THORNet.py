@@ -16,6 +16,10 @@ def build_actor_critic_network(scope, num_action, num_scene):
     with tf.variable_scope(scope):
         # get the nodes of input images and output features
         with tf.name_scope('inputs'):
+            global_step = tf.placeholder(
+                name = 'global_step',
+                shape = None,
+                dtype = tf.int32)
             state_placeholder = tf.placeholder(
                 name  = 'state', 
                 shape = (None, 2048), 
@@ -32,11 +36,12 @@ def build_actor_critic_network(scope, num_action, num_scene):
                 name  = 'q_value',
                 shape = (None, ),
                 dtype = tf.float32)
+            """
             advantage_placeholder = tf.placeholder(
                 name  = 'advantage',
                 shape = (None, ),
                 dtype = tf.float32)
-        
+            """
 
         # compute embedded feature given the input image feature
         variable_dict = {}
@@ -60,7 +65,7 @@ def build_actor_critic_network(scope, num_action, num_scene):
         for scene in THORConfig.supported_envs:
             with tf.variable_scope(scene, reuse = False):
                 # fc3 shared for policy and value output
-                fc3 = TFUtil.fc_layer('fc_3', fc2, input_size=512, num_neron=512, variable_dict=variable_dict)
+                fc3 = TFUtil.fc_layer('fc3', fc2, input_size=512, num_neron=512, variable_dict=variable_dict)
                 # policy output
                 policy_logits = TFUtil.fc_layer('policy_logits', fc3, input_size=512, num_neron=num_action, activation=None, variable_dict=variable_dict)
                 policy_probs = tf.nn.softmax(name = 'policy_probs', logits = policy_logits)
@@ -70,7 +75,9 @@ def build_actor_critic_network(scope, num_action, num_scene):
                 policy_logits_dict[scene] = policy_logits
                 policy_prob_dict[scene] = policy_probs
                 state_value_dict[scene] = state_value 
+        
 
+        local_summaries = []
         with tf.variable_scope('loss'):
             scene_losses = {}
             for scene in THORConfig.supported_envs:
@@ -86,25 +93,25 @@ def build_actor_critic_network(scope, num_action, num_scene):
                 # need to tweak weight
                 scene_losses[scene] = policy_loss + value_loss - policy_entropy
                 with tf.name_scope(scene): 
-                    tf.summary.scalar('policy_loss', policy_loss)
-                    tf.summary.scalar('policy_entropy', policy_entropy)
-                    tf.summary.scalar('value_loss', value_loss)
+                    local_summaries.append(tf.summary.scalar('policy_loss', policy_loss))
+                    local_summaries.append(tf.summary.scalar('policy_entropy', policy_entropy))
+                    local_summaries.append(tf.summary.scalar('value_loss', value_loss))
+        local_summary_op = tf.summary.merge(local_summaries)
 
-    with tf.name_scope('train_ops'):
+    with tf.variable_scope('train_ops', reuse = (scope != "global")):
         train_ops = {}
         # train_op
         # optional: varying learning_rate
-        """
-        learning_rate = tf.train.exponential_decay(
-            learning_rate = A3CConfig.learning_rate, 
-            global_step   = global_step, 
-            decay_steps   = A3CConfig.decay_step,
-            decay_rate    = A3CConfig.decay_rate)
-        """
+        
+        learning_rate = tf.train.polynomial_decay(
+            learning_rate        = A3CConfig.learning_rate, 
+            global_step          = global_step, 
+            decay_steps          = A3CConfig.decay_step,
+            end_learning_rate    = A3CConfig.end_learning_rate)
         
         # create optimizer
         #optimizer = tf.train.AdamOptimizer(learning_rate = A3CConfig.learning_rate)
-        optimizer = tf.train.RMSPropOptimizer(learning_rate = A3CConfig.learning_rate, decay = A3CConfig.decay_rate, epsilon = 0.1)#, momentum = A3CConfig.momentum)
+        optimizer = tf.train.RMSPropOptimizer(learning_rate = learning_rate, decay = A3CConfig.decay_rate, epsilon = 0.1)#, momentum = A3CConfig.momentum)
         
         for scene in THORConfig.supported_envs:
             # get local trainable variables and compute gradients
@@ -115,7 +122,7 @@ def build_actor_critic_network(scope, num_action, num_scene):
             clipped_grad_var = []
             for grad, var in grad_var:
                 if grad is not None:
-                    clipped_grad_var.append((tf.clip_by_norm(grad, 40.), var))
+                    clipped_grad_var.append((tf.clip_by_value(grad, -40., 40.), var))
                 else:
                     clipped_grad_var.append((None, var))
             grad_var = clipped_grad_var
@@ -129,27 +136,21 @@ def build_actor_critic_network(scope, num_action, num_scene):
                 grad_var = tmp
                     
             train_ops[scene] = optimizer.apply_gradients(grad_var)
-    
-    # get summary ops
-    with tf.variable_scope('global', reuse = (scope != "global")):
-        tmp_scope.reuse_variables()
-        reward = tf.get_variable(
-            name = 'global/reward',
-            shape = (1, ),
-            dtype = tf.float32,
-            trainable = False)
-        num_step = tf.get_variable(
-            name = 'global/num_steps',
-            shape = (1, ),
-            dtype = tf.float32,
-            trainable = False)
-    if scope == "global":
-        with tf.name_scope("global_summary"):
-            tf.summary.scalar('reward', reward)
-            tf.summary.scalar('average_steps_over_100_episodes', num_step)
 
-    return (state_placeholder, target_placeholder, action_placeholder, q_value_placeholder), \
+        with tf.variable_scope('global', reuse = (scope != "global")):
+            reward = tf.get_variable(
+                name = 'global/reward',
+                shape = (1, ),
+                dtype = tf.float32,
+                trainable = False)
+            num_step = tf.get_variable(
+                name = 'global/num_steps',
+                shape = (1, ),
+                dtype = tf.int32,
+                trainable = False)
+
+    return (global_step, state_placeholder, target_placeholder, action_placeholder, q_value_placeholder), \
            (policy_prob_dict, state_value_dict), \
-           (train_ops, ), \
+           (train_ops, local_summary_op), \
            (reward, num_step)
 
